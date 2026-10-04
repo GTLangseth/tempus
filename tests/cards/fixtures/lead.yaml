@@ -1,0 +1,16 @@
+version: 1
+title: Leader → follower
+question: Does the leader lead?
+window: {start: 2019-01-01}
+inputs:
+  x: fred:XLEAD
+  y: {series: fred:YFOLLOW, label: The follower}
+formulas:
+  x_yoy: yoy(x)
+  y_yoy: yoy(y)
+  lead: lagcorr(x_yoy, y_yoy, nlags=3)
+panels:
+  - {type: timeseries, title: YoY, y: [x_yoy, y_yoy]}
+  - {type: lagcorr, data: lead}
+  - {type: stat, y: x, change: period}
+  - {type: table, data: lead}
