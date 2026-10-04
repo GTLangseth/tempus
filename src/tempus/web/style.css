@@ -1,0 +1,31 @@
+/* Colors, fonts and spacing come from theme.json via CSS variables set in app.js. */
+* { box-sizing: border-box; }
+body { margin: 0; display: grid; grid-template-columns: 300px 1fr; min-height: 100vh;
+       background: var(--bg); color: var(--text); font: var(--size) var(--family); }
+aside { border-right: 1px solid var(--border); padding: calc(var(--space) * 2); overflow-y: auto;
+        max-height: 100vh; position: sticky; top: 0; }
+h1 { font-size: 16px; margin: 0 0 calc(var(--space) * 2); letter-spacing: 0.04em; }
+main { padding: calc(var(--space) * 3); max-width: 1200px; }
+.muted { color: var(--muted); }
+details { margin-left: calc(var(--space) * 1.5); }
+summary { cursor: pointer; padding: 2px 0; }
+summary .count { color: var(--muted); font-size: 11px; margin-left: 4px; }
+a.card { display: block; color: var(--accent); text-decoration: none; padding: 2px 0 2px 18px; }
+a.card.active { font-weight: 600; }
+a.card.invalid { color: var(--error); }
+.question { color: var(--muted); font-size: 15px; margin-top: -8px; }
+.notes { white-space: pre-wrap; color: var(--muted); border-left: 2px solid var(--border);
+         padding-left: calc(var(--space) * 1.5); }
+.panel { background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius);
+         padding: calc(var(--space) * 2); margin: calc(var(--space) * 2) 0; }
+.panel h3 { margin: 0 0 var(--space); font-size: 14px; }
+.panel .sub { color: var(--muted); font-size: 12px; margin-bottom: var(--space); }
+.chart { height: 340px; }
+.stat .value { font-size: 36px; font-weight: 600; }
+.stat .chart { height: 60px; }
+.errors { border: 1px solid var(--error); border-radius: var(--radius);
+          padding: calc(var(--space) * 1.5); font-family: var(--mono); font-size: 12px;
+          white-space: pre-wrap; color: var(--error); }
+.warning { color: var(--warning); font-size: 12px; }
+table { border-collapse: collapse; font-family: var(--mono); font-size: 12px; }
+td, th { padding: 2px 10px; border-bottom: 1px solid var(--border); text-align: right; }

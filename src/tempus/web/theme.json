@@ -1,0 +1,15 @@
+{
+  "color": {
+    "bg": "#0f1115", "panel": "#171a21", "border": "#262b36", "text": "#e6e8ee",
+    "muted": "#8b93a7", "grid": "#262b36", "accent": "#7aa2f7",
+    "error": "#f7768e", "warning": "#e0af68",
+    "series": ["#7aa2f7", "#e0af68", "#9ece6a", "#f7768e", "#bb9af7", "#7dcfff"]
+  },
+  "font": {
+    "family": "Inter, system-ui, -apple-system, sans-serif",
+    "mono": "ui-monospace, SFMono-Regular, Menlo, monospace",
+    "size": 13
+  },
+  "space": 8,
+  "radius": 8
+}
