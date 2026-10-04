@@ -17,6 +17,7 @@ from tempus.cards.check import check_card
 from tempus.cards.errors import has_errors
 from tempus.cards.repository import FileCardRepository
 from tempus.cards.run import run_card
+from tempus.cards.spec import CARD_ID
 from tempus.config import Settings, get_settings
 from tempus.explore import SourceFactory, catalog_from_db, explore_payload, series_page
 from tempus.jev import JevClient, JevError
@@ -27,7 +28,8 @@ WEB_DIR = Path(__file__).with_name("web")
 
 
 def card_event(repo: FileCardRepository, path: Path) -> dict | None:
-    if path.suffix != ".yaml":
+    # Editors' temp and backup files (.#card.yaml, card.tmp.yaml) aren't cards.
+    if path.suffix != ".yaml" or not CARD_ID.fullmatch(path.stem):
         return None
     card_id = path.stem
     if not path.exists():
