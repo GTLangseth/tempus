@@ -175,12 +175,13 @@ def _fill(x: Series, method: str) -> Series:
 
 
 def _diff(x: Series, n: int) -> Series:
-    return _with(x, pl.col("value").diff(n), f"{x.label}, change")
+    return replace(_with(x, pl.col("value").diff(n), f"{x.label}, change"), kind="change")
 
 
 def _pct_change(x: Series, n: int) -> Series:
     v = pl.col("value")
-    return _with(x, (_safe_ratio(v, v.shift(n)) - 1) * 100, f"{x.label}, % change")
+    out = _with(x, (_safe_ratio(v, v.shift(n)) - 1) * 100, f"{x.label}, % change")
+    return replace(out, kind="change")
 
 
 def _yoy(x: Series) -> Series:
@@ -194,7 +195,7 @@ def _yoy(x: Series) -> Series:
     df = x.df.join(prior, on="ts", how="left").select(
         "ts", ((_safe_ratio(pl.col("value"), pl.col("prior")) - 1) * 100).alias("value")
     )
-    return replace(x, df=df.sort("ts"), label=f"{x.label}, YoY %", units="%")
+    return replace(x, df=df.sort("ts"), label=f"{x.label}, YoY %", units="%", kind="change")
 
 
 def _log(x: Series) -> Series:
@@ -339,7 +340,9 @@ def _set_agg(how: str):
         }[how]
         df = pl.concat([m.df for m in s.members]).group_by("ts").agg(expr.alias("value"))
         first = s.members[0]
-        return Series(s.name, f"{how} of {s.name}", first.freq, df.sort("ts"), first.units)
+        return Series(
+            s.name, f"{how} of {s.name}", first.freq, df.sort("ts"), first.units, first.kind
+        )
 
     return impl
 
@@ -389,6 +392,8 @@ def _lagcorr(x: Series, y: Series, nlags: int) -> Table:
         rows.append({"lag": k, "r": r, "n": joined.height})
     warnings = []
     for s in (x, y):
+        if s.kind != "level":
+            continue  # a change series that trends isn't the spurious-levels case
         ac = _lag1_autocorr(s)
         if ac is not None and ac > 0.95:
             warnings.append(
@@ -426,7 +431,8 @@ def binop(op: str, left: Value, right: Value, what: str) -> Value:
     if isinstance(left, Series) and isinstance(right, Series):
         df = align(left, right, what)
         out = df.select("ts", f(pl.col("a"), pl.col("b")).alias("value"))
-        return Series(left.name, what, left.freq, out)
+        kind = "change" if left.kind == right.kind == "change" else "level"
+        return Series(left.name, what, left.freq, out, kind=kind)
     if isinstance(left, Series):
         return _with(left, f(pl.col("value"), pl.lit(right)), what)
     if isinstance(right, Series):

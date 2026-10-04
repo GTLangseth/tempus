@@ -63,6 +63,28 @@ def test_lagcorr_warns_on_trending_levels():
     assert any("trending" in w for w in table.meta["warnings"])
 
 
+def test_change_transforms_mark_series_as_change():
+    m = monthly("m", [float(i) for i in range(1, 30)])
+    assert m.kind == "level"
+    assert fn("yoy", m).kind == fn("pct_change", m, 1).kind == fn("diff", m, 1).kind == "change"
+    assert fn("rolling", fn("diff", m, 1), 3).kind == "change"  # smoothing keeps the kind
+    assert fn("log", m).kind == "level"
+    d = fn("diff", m, 1)
+    assert binop("-", d, d, "d - d").kind == "change"
+    assert binop("-", d, m, "d - m").kind == "level"
+    assert binop("*", d, 100, "d * 100").kind == "change"
+
+
+def test_lagcorr_trend_warning_only_for_level_inputs():
+    # A change series that itself trends (e.g. accelerating inflation) is not the
+    # "trending in levels" case the warning is about.
+    accel = Series("a", "a", "M", monthly("a", [float(i) for i in range(30)]).df, kind="change")
+    assert fn("lagcorr", accel, accel, nlags=1).meta["warnings"] == []
+    level = monthly("t", [float(i) for i in range(30)])
+    warnings = fn("lagcorr", level, accel, nlags=1).meta["warnings"]
+    assert len(warnings) == 1 and "'t'" in warnings[0]
+
+
 def test_lagcorr_with_too_little_data_gives_none_not_nan():
     table = fn("lagcorr", monthly("a", [1.0]), monthly("b", [1.0]), nlags=0)
     assert table.df.to_dicts() == [{"lag": 0, "r": None, "n": 1}]
