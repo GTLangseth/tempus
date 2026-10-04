@@ -13,7 +13,7 @@ from tempus.cards.repository import CardRepository
 from tempus.cards.resolve import resolve
 from tempus.cards.spec import Card
 
-__all__ = ["PAYLOAD_VERSION", "CardResult", "run_card"]
+__all__ = ["PAYLOAD_VERSION", "CardResult", "run_card", "run_spec"]
 
 
 @dataclass
@@ -40,9 +40,21 @@ def run_card(
     end: date | None = None,
 ) -> CardResult:
     card, errors = repo.get(card_id)
-    result = CardResult(card_id, card, errors=errors)
     if card is None:
-        return result
+        return CardResult(card_id, card, errors=errors)
+    return run_spec(conn, card_id, card, start, end, errors)
+
+
+def run_spec(
+    conn: psycopg.Connection,
+    card_id: str,
+    card: Card,
+    start: date | None = None,
+    end: date | None = None,
+    errors: list[CardError] | None = None,
+) -> CardResult:
+    """Run a card that is already parsed, e.g. an implicit one built for a series page."""
+    result = CardResult(card_id, card, errors=list(errors or []))
     result.errors += check_card(card_id, card)[1]
     if has_errors(result.errors):
         return result

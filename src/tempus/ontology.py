@@ -55,6 +55,16 @@ def _parse(nodes, parent_id: str | None, where: str) -> list[Concept]:
     return concepts
 
 
+def from_rows(rows) -> list[Concept]:
+    """Rebuild the tree from `concepts` rows (id, parent_id, name, description, position)."""
+    nodes = {r["id"]: Concept(r["id"], r["name"], r["description"], r["parent_id"]) for r in rows}
+    roots = []
+    for r in sorted(rows, key=lambda r: (r["position"], r["id"])):
+        parent = nodes.get(r["parent_id"]) if r["parent_id"] else None
+        (parent.children if parent else roots).append(nodes[r["id"]])
+    return roots
+
+
 def walk(concepts: list[Concept]):
     """Depth-first, parents before children."""
     for c in concepts:

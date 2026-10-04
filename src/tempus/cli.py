@@ -486,6 +486,49 @@ def ontology_tree(
     console.print(root)
 
 
+@app.command()
+def resolve(
+    phrase: str = typer.Argument(..., help='e.g. "crude oil price"'),
+    limit: int = typer.Option(10, help="How many series to list"),
+    lexical: bool = typer.Option(False, help="Use the lexical fallback even with a key"),
+):
+    """Find the concepts and series a phrase means, by walking the tree (Jevbox-style)."""
+    from tempus.explore import catalog_from_db
+    from tempus.navigate import LexicalChooser, navigate
+
+    settings = get_settings()
+    with _connect() as conn:
+        catalog = catalog_from_db(conn)
+    if not catalog.roots:
+        console.print("[yellow]No concepts loaded.[/yellow] Run `tempus ontology load`.")
+        raise typer.Exit(1)
+    if settings.typesafe_api_key and not lexical:
+        chooser, label = JevClient(settings.typesafe_api_key), "jev"
+    else:
+        chooser, label = LexicalChooser(catalog), "lexical fallback"
+    try:
+        result = navigate(phrase, catalog, chooser, label=label)
+    except JevError as exc:
+        console.print(f"[red]{exc}[/red]")
+        raise typer.Exit(1) from exc
+    console.print(f"[dim]chooser: {result.chooser}[/dim]")
+    if not result.paths:
+        console.print("[yellow]Nothing in the tree fits that.[/yellow]")
+        raise typer.Exit(1)
+    for path in result.paths:
+        trail = " › ".join(
+            f"{name} [dim]{step['p']:.2f}[/dim]"
+            for name, step in zip(path.to_dict(catalog)["names"], path.steps, strict=True)
+        )
+        console.print(f"[bold]{path.score:.2f}[/bold]  {trail}")
+    if result.ambiguous:
+        console.print("[yellow]Ambiguous:[/yellow] the top routes are close; check both.")
+    table = Table("series", "p", "title")
+    for s in result.series[:limit]:
+        table.add_row(f"{s['source']}:{s['series_id']}", f"{s['p']:.2f}", s["title"] or "")
+    console.print(table)
+
+
 CARD_TEMPLATE = """\
 version: 1
 title: {title}
