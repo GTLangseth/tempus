@@ -1,0 +1,15 @@
+.env
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.ruff_cache/
+dist/
+node_modules/
+.next/
+.DS_Store
+
+# Locally installed agent skills
+.agents/
+.claude/skills/
+skills-lock.json

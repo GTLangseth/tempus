@@ -1,0 +1,18 @@
+# Series that `tempus sync` keeps up to date.
+# Add with `tempus catalog add fred <SERIES_ID>` or edit by hand.
+
+[[series]]
+source = "fred"
+id = "UNRATE"   # Unemployment Rate
+
+[[series]]
+source = "fred"
+id = "CPIAUCSL" # CPI, All Urban Consumers
+
+[[series]]
+source = "fred"
+id = "GDP"      # Gross Domestic Product
+
+[[series]]
+source = "fred"
+id = "DGS10"    # 10-Year Treasury Constant Maturity Rate

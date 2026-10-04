@@ -1,0 +1,23 @@
+services:
+  db:
+    image: timescale/timescaledb-ha:pg18
+    container_name: tempus-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${TEMPUS_DB_PASSWORD:-password}
+      POSTGRES_DB: ${TEMPUS_DB_NAME:-tempus}
+    ports:
+      - "${TEMPUS_DB_PORT:-5432}:5432"
+    volumes:
+      # The image runs as a non-root user; mounting over its own data dir keeps ownership right.
+      - tempus-pgdata:/home/postgres/pgdata
+    healthcheck:
+      # Check over TCP: during first-boot init, a temporary server listens on the socket only.
+      test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -U postgres -d ${TEMPUS_DB_NAME:-tempus}"]
+      interval: 2s
+      timeout: 5s
+      retries: 30
+
+volumes:
+  tempus-pgdata:

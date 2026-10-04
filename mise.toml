@@ -1,0 +1,61 @@
+[tools]
+python = "3.12"
+uv = "latest"
+node = "22"   # reserved for the upcoming web/ front end
+
+[env]
+_.file = ".env"
+_.python.venv = { path = ".venv", create = true }
+
+# ---------------------------------------------------------------------------
+# Tasks: `mise run <task>` (or `mise <task>` when unambiguous)
+# ---------------------------------------------------------------------------
+
+[tasks.setup]
+description = "Install Python deps, create .env, start the DB, apply schema"
+run = [
+  "test -f .env || cp .env.example .env",
+  "uv sync",
+  "mise run db:up",
+  "uv run tempus db init",
+]
+
+[tasks."db:up"]
+description = "Start TimescaleDB (Tiger) in Docker and wait until healthy"
+run = "docker compose up -d --wait db"
+
+[tasks."db:down"]
+description = "Stop the database container (data is kept)"
+run = "docker compose down"
+
+[tasks."db:reset"]
+description = "Destroy the database volume and re-create the schema"
+run = [
+  "docker compose down -v",
+  "mise run db:up",
+  "uv run tempus db init",
+]
+
+[tasks."db:psql"]
+description = "Open a psql shell inside the container"
+run = "docker compose exec db psql -U postgres -d ${TEMPUS_DB_NAME:-tempus}"
+
+[tasks."db:logs"]
+description = "Tail database logs"
+run = "docker compose logs -f db"
+
+[tasks.sync]
+description = "Sync every series in catalog.toml into the database"
+run = "uv run tempus sync"
+
+[tasks.test]
+description = "Run the test suite"
+run = "uv run pytest"
+
+[tasks.lint]
+description = "Lint and format-check"
+run = ["uv run ruff check .", "uv run ruff format --check ."]
+
+[tasks.fmt]
+description = "Auto-format and fix lint"
+run = ["uv run ruff format .", "uv run ruff check --fix ."]
