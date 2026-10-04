@@ -7,6 +7,8 @@ TimescaleDB (Tiger Data), then explore it.
 catalog.toml ──▶ tempus sync ──▶ sources/ (fred, …) ──▶ TimescaleDB (docker) ──▶ web/ (soon)
 ```
 
+Blueprint, decisions, and roadmap: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
+
 ## Setup
 
 Requires [mise](https://mise.jdx.dev) and Docker.
