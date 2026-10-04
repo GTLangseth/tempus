@@ -8,7 +8,19 @@ decision. Implementation detail belongs in code and the README, not here.
 
 A personal time-series lab. Collect public data (economic data first, from FRED) into one
 TimescaleDB database. Then build beautiful, interactive interfaces for exploring that data
-and learning from it.
+and learning from it. The longer-range vision lives in [`SOUL.md`](SOUL.md): cards,
+an LLM-friendly card language, prediction markets, signals, and a playground for
+learning forecasting.
+
+## Principles
+
+Tools are chosen to fit the job, judged against this vision: FOSS by default, the smallest
+tool that does the job, standard interfaces so swaps stay cheap, proven conventions
+(Grafana, Datadog, Vega-Lite, Ossie) borrowed instead of invented, and a revisit trigger
+for every choice. Easy-to-undo choices are made fast and logged as provisional. Hard-to-undo
+ones (one-way doors) are flagged and decided explicitly, and seams such as adapters,
+versioned file formats and theme tokens keep as many choices as possible easy to undo. The full principles, the register of tools with the alternatives considered,
+and the quarterly review procedure live in [`STACK.md`](STACK.md).
 
 ## Components
 
@@ -55,9 +67,97 @@ ontology/concepts.yaml ──▶ tempus ontology file ──▶ Jev (TypeSafe AP
 Each series is identified by the pair `(source, series_id)`, so the same ID can exist at
 two different providers without colliding.
 
+## Using Jev in agentic workflows
+
+TypeSafe's Jev returns typed decisions with calibrated probabilities: a **choice** among up
+to 255 options, a **score** on an ordered scale of 2–10 levels, or a yes/no probability.
+It doesn't generate text, and it costs very little ($0.042 per million input tokens).
+Tempus uses it wherever an agent must pick from a closed set and the decision should be
+fast, calibrated and on record.
+
+### Who does what
+
+| Work | Tool | Examples |
+|---|---|---|
+| **Decide** among a closed set | Jev | where a series is filed, which series a phrase means, which card operation fits, is this card valid |
+| **Generate** open-ended text or structure | Claude | branch names, drafting cards, explanations, pulling out a threshold or date |
+| **Compute** anything numeric | Code / SQL | transforms, correlations, choosing a forecasting method, detecting regimes from data |
+
+If a rule or metadata already answers the question (e.g. FRED's `units` field), parse it
+instead of asking a model. When a workflow needs both, Jev routes or constrains first and
+Claude generates only inside the decided slot. That's faster and cheaper, and Claude can't
+invent options outside the vocabulary.
+
+### Making decisions reproducible
+
+Jev is calibrated but not exactly repeatable. Five identical calls on the 30-year mortgage
+rate (MORTGAGE30US) gave `rates` probabilities of 0.74–0.79 against `housing` at
+0.21–0.26. The top choice was stable, but the probability drifted by about ±0.03.
+Reproducibility therefore comes from how tempus uses Jev, not from the model:
+
+1. **Pin the model version.** Use a fixed version (e.g. `jev-1.13.0`), not `jev-latest`.
+   Upgrading is a deliberate change, followed by re-deciding and reviewing what moved.
+2. **Record decisions, don't re-ask.** Each decision is stored with a hash of the exact
+   input (state, question, options, model version). The same input returns the recorded
+   answer without an API call. Placements in `series_concepts` already work this way.
+3. **Commit only to clear decisions.** Thresholds (filing: probability ≥ 0.65 and a lead
+   of ≥ 0.2 over the runner-up) decide whether to act. A result within about ±0.05 of a
+   threshold is marked **needs review** instead of being accepted or rejected silently.
+4. **Keep the evidence.** Every recorded decision keeps its ranked probabilities (the
+   `trail`), so a person can see why and override with a pin.
+
+### Where it's used
+
+By the horizon in [`SOUL.md`](SOUL.md) where it first matters. Status: ✅ built ·
+⬜ planned.
+
+| Use | Primitive | Horizon | Status | Why Jev |
+|---|---|---|---|---|
+| **Filing:** place series in the concept tree | choice per level | Explore | ✅ | Calibrated thresholds; decisions recorded, with pins to override |
+| **Ontology upkeep:** Claude proposes a branch; Jev checks it's needed and distinct from its siblings. When the tree changes, re-ask only the series placed near the changed branch | yes/no, choice | Explore | ⬜ | Completes the Jevbox pattern without trusting generated branches blindly |
+| **Ranking for deep dives:** score FRED search results by "is this the headline series for this concept?" | score | Explore | ⬜ | Turns hundreds of search hits into a short list worth adding |
+| **Series labels:** how each series is measured (level, % change, rate, index), real vs. nominal, geography | choice | Explore → Cards | ⬜ | Cards need these to transform safely, e.g. no YoY change of a series that's already a YoY change. Recorded once per series |
+| **Resolving phrases to series IDs:** "crude" → `prices.commodities.energy` → `DCOILWTICO` | choice per level (beam search) | Cards → Converse | ⬜ | Removes invented series IDs, the most likely failure when an LLM drafts a card. Every reference exists and has a probability |
+| **Choosing the card operation:** question → compare, lead-lag, ratio, rebase, forecast, find precedents | choice | Cards → Converse | ⬜ | Constrains Claude to the card vocabulary; it fills in the slots for one operation |
+| **Checking cards before they run:** does it answer the question? is the transform valid for these units? are the series comparable? | yes/no | Cards | ⬜ | Semantic validation next to schema validation; cheap enough for every draft |
+| **Picking saved cards for a question:** rank the card library for a question | score | Converse | ⬜ | Jevbox's search, applied to cards instead of documents |
+| **Prediction markets:** map each market to the indicator it bets on (e.g. "CPI YoY > 3% in March" → `CPIAUCSL`) | choice | Widen | ⬜ | Classifying thousands of markets into a closed set of targets; Claude extracts the threshold and date |
+| **Matching series across sources:** is series A at one source the same concept as series B at another? | yes/no | Widen | ⬜ | Avoids duplicate concepts as sources multiply |
+| **Text into time series:** score FOMC statements hawkish to dovish; label historical episodes for finding precedents | score, choice | Signal | ⬜ | Recorded, consistent scores become new series. See the caveat below |
+
+### Not for
+
+- **Numbers.** Correlations, transforms, choosing a forecasting method (statistical tests
+  for trend and seasonality do this better) and detecting regimes all stay in code, where
+  they're exactly reproducible and explainable ("understanding over automation").
+- **Generation.** Names, drafts and explanations are Claude's job.
+- **Historical text as backtest input without care.** A model scoring a 2007 statement may
+  know what happened in 2008. Scores of historical text are useful descriptions, but they
+  violate "honest with time" as backtest inputs unless that leak is controlled for.
+
 ## Decisions
 
 Newest first. Each entry: what we chose, and why.
+
+- **2026-10-04 · Jev decides, Claude generates, code computes.** In agentic workflows, Jev
+  handles every choice from a closed set: filing, resolving phrases to series IDs, choosing
+  card operations, series labels, card checks and market mapping. Claude generates only
+  inside the slot Jev decided, and numbers stay in code. A repeat test showed about ±0.03
+  drift in probabilities, so reproducibility comes from pinning the model version,
+  recording decisions by input hash, and a review band around each threshold. See
+  [Using Jev](#using-jev-in-agentic-workflows). This also resolves the open question on new
+  branches: Claude proposes, Jev checks, a person reviews the YAML diff.
+
+- **2026-10-04 · Stack register with quarterly review.** `docs/STACK.md` records each tool,
+  its license, the alternatives we compared it with, and what would make us revisit it.
+  A review runs quarterly or when a trigger fires (`mise run stack:review-due`). Choices
+  should stay defensible against the vision, not just persist by inertia.
+- **2026-10-04 · TimescaleDB is the serving layer, with the narrow schema.** Series that
+  are unrelated and sparse at mixed frequencies suit `(source, series_id, ts) → value`.
+  TimescaleDB earns its place over DuckDB through concurrent serving, cheap row-level
+  reconcile, continuous aggregates and the Postgres ecosystem. It does not win on wide
+  analytical scans, which belong in a warehouse. If tempus stays read-mostly and
+  single-user, DuckDB is the revisit trigger. Comparison: `STACK.md` → Storage.
 
 - **2026-10-04 · Commodities and the CPI components they feed are tracked as pairs.**
   The first deep dive covered both ends of each chain: commodity prices (energy,
@@ -105,6 +205,14 @@ Newest first. Each entry: what we chose, and why.
 
 ## Open questions
 
+- **Semantic-layer source:** should tempus cache slices of upstream warehouse metrics
+  (e.g. Snowflake, defined in an Apache Ossie semantic model) as series? The sketch: a
+  `semantic` source whose catalog entry is a query spec (model, metric, time dimension,
+  grain, dimension slice), a `dimensions jsonb` column on `series`, and a reconcile scoped
+  to a recent window instead of the whole series. Open: how freshness is detected without
+  a `last_updated` stamp, and how non-additive metrics are cached. See `STACK.md` → Two
+  domains.
+
 - **Cross-links:** some series belong to two concepts (real consumer spending is both a
   GDP component and household spending; mortgage rates are both rates and housing). Add
   typed links between concepts (`component_of`, `deflated_by`, `leads`) or secondary
@@ -113,8 +221,6 @@ Newest first. Each entry: what we chose, and why.
   1 month), arabica coffee → CPI coffee (0.82 at 7 months), the global food index → CPI
   food at home (0.72 at 9 months), and crude oil → core CPI (only 0.30). Open questions:
   should links be declared in YAML, computed, or both? And at series level or concept level?
-- **New branches:** when a series fits nowhere, should a model propose a branch for a
-  person to review (Jevbox's approach), or is a person editing the YAML enough?
 
 - **Scheduling:** is a long-running `tempus sync --every` loop enough? The alternatives are
   cron or launchd, or an orchestrator (Dagster or Prefect) once there are several sources

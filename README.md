@@ -51,6 +51,7 @@ entry. Pins override automatic filing.
 | `db:psql` / `db:logs` | shell / logs |
 | `sync` | `tempus sync` |
 | `test` / `lint` / `fmt` | dev loop |
+| `stack:review-due` | is the quarterly stack review ([docs/STACK.md](docs/STACK.md)) due? |
 
 ## Data model
 

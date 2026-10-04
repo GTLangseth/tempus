@@ -48,6 +48,23 @@ run = "docker compose logs -f db"
 description = "Sync every series in catalog.toml into the database"
 run = "uv run tempus sync"
 
+[tasks."stack:review-due"]
+description = "Report how long since the last stack review (docs/STACK.md)"
+run = '''
+python3 - <<'PY'
+import datetime, re, sys
+text = open("docs/STACK.md").read()
+m = re.search(r"\*\*Last reviewed:\*\* (\d{4}-\d{2}-\d{2})", text)
+if not m:
+    sys.exit("No 'Last reviewed' date found in docs/STACK.md")
+days = (datetime.date.today() - datetime.date.fromisoformat(m.group(1))).days
+if days > 90:
+    print(f"Stack review OVERDUE: last reviewed {m.group(1)} ({days} days ago). See docs/STACK.md -> Review.")
+    sys.exit(1)
+print(f"Stack review current: last reviewed {m.group(1)} ({days} days ago); due in {90 - days} days.")
+PY
+'''
+
 [tasks.test]
 description = "Run the test suite"
 run = "uv run pytest"

@@ -1,7 +1,7 @@
 # tempus
 
 Collect public time-series data into TimescaleDB and explore it. Start with
-`docs/ARCHITECTURE.md` (the blueprint) and `README.md` (setup and CLI).
+`docs/SOUL.md` (why and where it's headed), `docs/ARCHITECTURE.md` (the blueprint) and `README.md` (setup and CLI).
 
 ## Keep the blueprint current
 
@@ -14,4 +14,10 @@ and why. Skip this for refactors and bug fixes.
 
 - `mise run test` and `mise run lint` must pass. Integration tests need the DB (`mise run db:up`).
 - Run repo chores as mise tasks. Data actions are `tempus` CLI subcommands.
+- Before a hard-to-reverse choice (stored data shape, file formats, public interfaces,
+  patterns that spread across the code), stop and flag it as a one-way door. Say what
+  reversing it would cost, offer a reversible alternative, and wait for a decision. Easy
+  choices: pick a default and log it under **Open decisions** in `docs/STACK.md`.
+- New tool or dependency: add a row to the register in `docs/STACK.md` with its license,
+  the alternatives considered, and a revisit trigger.
 - New provider: implement `Source` in `src/tempus/sources/` and register it in `sources/__init__.py`.
