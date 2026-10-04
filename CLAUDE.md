@@ -12,6 +12,8 @@ and why. Skip this for refactors and bug fixes.
 
 ## Working here
 
+- Work is tracked in the Linear project **tempus** (team Spaceman, `SPA-` issues; milestones follow
+  the horizons in `docs/SOUL.md`). Add new work there. Decisions still go in `docs/ARCHITECTURE.md`.
 - `mise run test` and `mise run lint` must pass. Integration tests need the DB (`mise run db:up`).
 - Run repo chores as mise tasks. Data actions are `tempus` CLI subcommands.
 - Before a hard-to-reverse choice (stored data shape, file formats, public interfaces,
