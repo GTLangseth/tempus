@@ -33,7 +33,14 @@ tempus sync --every 6h             # keep running on an interval
 tempus series list                 # what's stored, coverage, freshness
 tempus series show UNRATE          # sparkline + recent points
 tempus runs                        # sync history
+
+tempus ontology tree               # concept tree with the series filed in it
+tempus ontology file               # file unplaced series with Jev (needs TYPESAFE_API_KEY)
+tempus ontology load               # validate + load ontology/concepts.yaml (sync does this too)
 ```
+
+To pin a series to a concept by hand, add `concept = "rates.mortgage"` to its `catalog.toml`
+entry. Pins override automatic filing.
 
 ## mise tasks
 

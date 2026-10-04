@@ -1,0 +1,191 @@
+# The tempus concept tree: WHAT a series measures.
+#
+# Geography, frequency, seasonal adjustment and units are facets on each series, not levels
+# here. A concept's full ID is its dotted path (e.g. `labor.unemployment`). Descriptions are
+# shown to the filing model as the menu at each level, so make them say what belongs here
+# and how it differs from its siblings.
+#
+# Edit freely, then run `tempus ontology load`. Removing a concept un-files its series,
+# which `tempus ontology file` will then place again.
+
+- id: output
+  name: Output & Growth
+  description: Size and growth of the whole economy and its production. GDP and its expenditure components, industrial production, capacity utilization, productivity.
+  children:
+    - id: gdp
+      name: Gross Domestic Product
+      description: Total GDP or GNP, nominal or real, and the GDP price deflator.
+    - id: gdp_components
+      name: GDP Components
+      description: Expenditure components of GDP. Personal consumption, private investment, government spending, net exports, inventories.
+    - id: industrial_production
+      name: Industrial Production & Capacity
+      description: Output of manufacturing, mining and utilities, and capacity utilization.
+    - id: productivity
+      name: Productivity & Costs
+      description: Output per hour, unit labor costs, total factor productivity.
+
+- id: labor
+  name: Labor Market
+  description: Jobs, workers and pay. Unemployment, employment, participation, wages, layoffs and hiring.
+  children:
+    - id: unemployment
+      name: Unemployment
+      description: Unemployment rates and counts of unemployed people, including alternative measures (U-6) and duration of unemployment.
+    - id: employment
+      name: Employment & Payrolls
+      description: Number of people employed or jobs on payrolls (nonfarm payrolls, household employment), by industry or in total.
+    - id: participation
+      name: Participation
+      description: Labor force participation and employment-population ratios, and the size of the labor force.
+    - id: wages
+      name: Wages & Compensation
+      description: Hourly or weekly earnings, the employment cost index, compensation of employees.
+    - id: claims
+      name: Jobless Claims
+      description: Initial and continuing claims for unemployment insurance.
+    - id: turnover
+      name: Openings & Turnover
+      description: Job openings, hires, quits and layoffs (JOLTS).
+
+- id: prices
+  name: Prices & Inflation
+  description: How fast prices are changing. Consumer and producer prices, inflation expectations, commodity prices.
+  children:
+    - id: consumer
+      name: Consumer Prices
+      description: CPI and PCE price indexes, headline or core, their components, and average retail prices of specific items.
+      children:
+        - id: headline
+          name: Headline
+          description: Price index for all items in the consumer basket (all-items CPI, headline PCE price index).
+        - id: core
+          name: Core
+          description: Price index for all items excluding food and energy (core CPI, core PCE).
+        - id: food
+          name: Food & Beverages
+          description: Consumer prices of food and beverages, in total, at home or away from home, or for a specific item (e.g. coffee, eggs), as an index or an average retail price.
+        - id: energy
+          name: Energy
+          description: Consumer prices of energy, in total or for a specific item such as gasoline, fuel oil, electricity or utility gas.
+    - id: producer
+      name: Producer Prices
+      description: Producer price indexes for final demand, intermediate goods or specific industries.
+    - id: expectations
+      name: Inflation Expectations
+      description: Survey-based or market-implied expected inflation, including breakeven inflation rates.
+    - id: commodities
+      name: Commodity Prices
+      description: Wholesale spot or global benchmark prices of raw commodities (energy, agricultural, metals), not prices paid by consumers.
+      children:
+        - id: energy
+          name: Energy Commodities
+          description: Benchmark prices of crude oil (WTI, Brent), natural gas (Henry Hub) and refined fuels.
+        - id: agriculture
+          name: Agricultural Commodities
+          description: Global prices of food and farm commodities such as coffee, cocoa, sugar, wheat, corn and beef.
+        - id: metals
+          name: Metals
+          description: Prices of industrial or precious metals such as copper, aluminum and nickel.
+        # Broad indexes spanning several of these groups (e.g. all commodities) stay at this level.
+
+- id: rates
+  name: Interest Rates & Monetary Policy
+  description: The price of money and the stance of the central bank. Policy rates, Treasury yields, spreads, money supply and the Fed balance sheet.
+  children:
+    - id: policy
+      name: Policy Rates
+      description: The federal funds rate, its target range, and other overnight rates set or steered by the Fed (SOFR, IORB).
+    - id: treasury
+      name: Treasury Yields
+      description: Yields on US Treasury bills, notes and bonds, nominal or inflation-indexed (TIPS), at a specific maturity.
+    - id: spreads
+      name: Yield & Credit Spreads
+      description: Differences between two rates. Yield-curve spreads (10Y-2Y), corporate bond spreads, high-yield spreads.
+    - id: mortgage
+      name: Mortgage Rates
+      description: Interest rates on home mortgages (e.g. 30-year fixed).
+    - id: money
+      name: Money & Fed Balance Sheet
+      description: Money supply (M1, M2), bank reserves, and Federal Reserve assets and liabilities.
+
+- id: households
+  name: Households & Consumers
+  description: Income, spending, saving, debt and sentiment of households.
+  children:
+    - id: income
+      name: Income
+      description: Personal income and disposable personal income, nominal or real.
+    - id: spending
+      name: Retail & Consumer Spending
+      description: Retail sales, vehicle sales and other direct measures of consumer purchases.
+    - id: saving_credit
+      name: Saving & Credit
+      description: Personal saving rate, consumer credit, household debt and delinquencies.
+    - id: sentiment
+      name: Consumer Sentiment
+      description: Survey measures of consumer confidence and sentiment.
+
+- id: housing
+  name: Housing
+  description: Residential real estate activity and prices.
+  children:
+    - id: construction
+      name: Starts & Permits
+      description: Housing starts, building permits, units under construction and completed.
+    - id: sales
+      name: Home Sales & Inventory
+      description: New and existing home sales, months' supply, homes for sale.
+    - id: home_prices
+      name: Home Prices
+      description: House price indexes (Case-Shiller, FHFA) and median sales prices.
+
+- id: business
+  name: Business Activity
+  description: Firms' orders, inventories, profits and surveys of business conditions.
+  children:
+    - id: orders_inventories
+      name: Orders & Inventories
+      description: Durable goods orders, factory orders, business inventories and inventory-to-sales ratios.
+    - id: surveys
+      name: Business Surveys
+      description: Regional Fed manufacturing and services surveys, and other diffusion indexes of business conditions.
+    - id: profits
+      name: Corporate Profits
+      description: Corporate profits and business income.
+
+- id: trade
+  name: International Trade & Currencies
+  description: Flows of goods, services and capital across borders, and exchange rates.
+  children:
+    - id: balance
+      name: Trade Balance
+      description: Exports, imports, the trade balance and the current account.
+    - id: fx
+      name: Exchange Rates
+      description: Dollar exchange rates against single currencies or trade-weighted dollar indexes.
+
+- id: fiscal
+  name: Government Finance
+  description: Federal government revenue, spending, deficits and debt.
+  children:
+    - id: budget
+      name: Receipts, Outlays & Deficit
+      description: Federal receipts, outlays and the surplus or deficit.
+    - id: debt
+      name: Public Debt
+      description: Federal debt outstanding, held by the public or in total, including as a share of GDP.
+
+- id: markets
+  name: Financial Markets & Conditions
+  description: Asset prices, volatility and aggregate measures of financial stress.
+  children:
+    - id: equities
+      name: Equities
+      description: Stock market indexes and valuations.
+    - id: volatility
+      name: Volatility
+      description: Implied or realized volatility indexes (e.g. VIX).
+    - id: stress
+      name: Financial Conditions & Stress
+      description: Composite financial conditions or stress indexes (e.g. NFCI, STLFSI).

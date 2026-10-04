@@ -42,3 +42,25 @@ CREATE TABLE IF NOT EXISTS sync_runs (
 );
 
 CREATE INDEX IF NOT EXISTS sync_runs_started_at_idx ON sync_runs (started_at DESC);
+
+-- The concept tree, mirrored from ontology/concepts.yaml by `tempus ontology load`.
+CREATE TABLE IF NOT EXISTS concepts (
+    id          text    PRIMARY KEY,                       -- dotted path, e.g. labor.unemployment
+    parent_id   text    REFERENCES concepts ON DELETE CASCADE,
+    name        text    NOT NULL,
+    description text    NOT NULL,
+    position    integer NOT NULL                           -- order among siblings
+);
+
+-- Where each series sits in the tree (one concept per series).
+CREATE TABLE IF NOT EXISTS series_concepts (
+    source     text        NOT NULL,
+    series_id  text        NOT NULL,
+    concept_id text        REFERENCES concepts ON DELETE CASCADE,  -- NULL = filed, but no fit at the top level
+    method     text        NOT NULL CHECK (method IN ('manual', 'auto')),
+    confidence real,                                       -- lowest probability along the auto path
+    trail      jsonb       NOT NULL DEFAULT '[]'::jsonb,   -- each level's decision, for review
+    filed_at   timestamptz NOT NULL DEFAULT now(),
+    PRIMARY KEY (source, series_id),
+    FOREIGN KEY (source, series_id) REFERENCES series ON DELETE CASCADE
+);

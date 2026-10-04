@@ -8,7 +8,9 @@ class Settings(BaseSettings):
 
     database_url: str = "postgres://postgres:password@localhost:5432/tempus"
     fred_api_key: str | None = None
+    typesafe_api_key: str | None = None
     catalog_path: Path = Path("catalog.toml")
+    ontology_path: Path = Path("ontology/concepts.yaml")
 
 
 def get_settings() -> Settings:

@@ -6,8 +6,10 @@ import typer
 from rich.console import Console
 from rich.table import Table
 
-from tempus import catalog, db
+from tempus import catalog, db, ontology
 from tempus.config import get_settings
+from tempus.filing import file_series
+from tempus.jev import JevClient, JevError
 from tempus.sources import SOURCE_NAMES, get_source
 from tempus.sources.fred import FredError
 from tempus.sync import sync_series
@@ -19,10 +21,15 @@ catalog_app = typer.Typer(
 )
 series_app = typer.Typer(help="Inspect series stored in the database.", no_args_is_help=True)
 fred_app = typer.Typer(help="Explore FRED.", no_args_is_help=True)
+ontology_app = typer.Typer(
+    help="The concept tree (ontology/concepts.yaml) and where series sit in it.",
+    no_args_is_help=True,
+)
 app.add_typer(db_app, name="db")
 app.add_typer(catalog_app, name="catalog")
 app.add_typer(series_app, name="series")
 app.add_typer(fred_app, name="fred")
+app.add_typer(ontology_app, name="ontology")
 
 console = Console()
 SPARK = "▁▂▃▄▅▆▇█"
@@ -114,7 +121,7 @@ def catalog_add(
     for series_id in series_ids:
         series_id = series_id.upper() if source == "fred" else series_id
         meta = src.fetch_meta(series_id)  # validates the ID exists
-        if catalog.add(settings.catalog_path, source, series_id):
+        if catalog.add(settings.catalog_path, source, series_id, meta.title):
             console.print(f"[green]added[/green] {source}:{series_id}  [dim]{meta.title}[/dim]")
         else:
             console.print(f"[yellow]already present[/yellow] {source}:{series_id}")
@@ -173,6 +180,7 @@ def sync(
                 result = sync_series(conn, sources[e.source], e.id, force=force)
                 failed += result.status == "failed"
                 _print_result(result)
+            _load_ontology(conn, settings, quiet=True)
 
         if interval is None:
             raise typer.Exit(1 if failed else 0)
@@ -306,3 +314,126 @@ def fred_search(text: str, limit: int = typer.Option(20)):
         )
     console.print(table)
     console.print("[dim]Track one with: tempus catalog add fred <ID> --sync[/dim]")
+
+
+# --- ontology --------------------------------------------------------------
+
+
+def _load_ontology(conn, settings, *, quiet: bool = False) -> list[ontology.Concept]:
+    """Validate the YAML tree and catalog pins, then mirror both into the database."""
+    try:
+        roots = ontology.load(settings.ontology_path)
+    except (ontology.OntologyError, OSError) as exc:
+        console.print(f"[red]{exc}[/red]")
+        raise typer.Exit(1) from exc
+    known = {c.id for c in ontology.walk(roots)}
+    pins = catalog.pins(catalog.load(settings.catalog_path))
+    bad = {f"{s}:{i} → {c}" for (s, i), c in pins.items() if c not in known}
+    if bad:
+        console.print(f"[red]catalog.toml pins to unknown concepts:[/red] {', '.join(sorted(bad))}")
+        raise typer.Exit(1)
+    upserted, removed = ontology.sync_to_db(conn, roots)
+    pinned = ontology.apply_pins(conn, pins)
+    if not quiet:
+        console.print(
+            f"[green]{upserted} concepts loaded[/green] ({removed} removed), {pinned} pins"
+        )
+    return roots
+
+
+@ontology_app.command("load")
+def ontology_load():
+    """Validate ontology/concepts.yaml and catalog pins, and load them into the database."""
+    with _connect() as conn:
+        _load_ontology(conn, get_settings())
+
+
+@ontology_app.command("file")
+def ontology_file(
+    refile: bool = typer.Option(False, help="Re-decide existing auto placements too"),
+):
+    """Place unfiled series in the tree with Jev. Manual pins are never changed."""
+    settings = get_settings()
+    try:
+        jev = JevClient(settings.typesafe_api_key)
+    except JevError as exc:
+        console.print(f"[red]{exc}[/red]")
+        raise typer.Exit(1) from exc
+    with _connect() as conn:
+        roots = _load_ontology(conn, settings, quiet=True)
+        n = 0
+        for source, series_id, p in file_series(conn, roots, jev, refile=refile):
+            n += 1
+            where = p.concept_id or "[yellow]no fit — needs a new branch?[/yellow]"
+            conf = f"[dim]{p.confidence:.2f}[/dim]" if p.confidence is not None else ""
+            console.print(f"  {source}:{series_id} → {where} {conf}")
+    if not n:
+        console.print("[dim]Nothing to file.[/dim]")
+
+
+@ontology_app.command("tree")
+def ontology_tree(
+    series: bool = typer.Option(True, help="List the series filed under each concept"),
+):
+    """Show the concept tree with the series filed in it."""
+    from rich.tree import Tree
+
+    with _connect() as conn:
+        concepts = conn.execute(
+            "SELECT id, parent_id, name FROM concepts ORDER BY position"
+        ).fetchall()
+        placed = conn.execute(
+            """
+            SELECT sc.concept_id, sc.method, sc.confidence, s.source, s.series_id, s.title
+            FROM series_concepts sc JOIN series s USING (source, series_id)
+            ORDER BY s.series_id
+            """
+        ).fetchall()
+        unplaced = conn.execute(
+            """
+            SELECT s.source, s.series_id, s.title FROM series s
+            LEFT JOIN series_concepts sc USING (source, series_id)
+            WHERE sc.series_id IS NULL ORDER BY s.series_id
+            """
+        ).fetchall()
+    if not concepts:
+        console.print("[yellow]No concepts loaded.[/yellow] Run `tempus ontology load`.")
+        raise typer.Exit(1)
+
+    by_concept: dict[str | None, list] = {}
+    for r in placed:
+        by_concept.setdefault(r["concept_id"], []).append(r)
+    children: dict[str | None, list] = {}
+    for c in concepts:
+        children.setdefault(c["parent_id"], []).append(c)
+
+    def count(concept_id: str) -> int:
+        return len(by_concept.get(concept_id, [])) + sum(
+            count(c["id"]) for c in children.get(concept_id, [])
+        )
+
+    def label(r) -> str:
+        how = "📌" if r["method"] == "manual" else f"{r['confidence']:.2f}"
+        return f"[cyan]{r['series_id']}[/cyan] [dim]{(r['title'] or '')[:60]} · {how}[/dim]"
+
+    def add(node: Tree, parent_id: str | None) -> None:
+        for c in children.get(parent_id, []):
+            n = count(c["id"])
+            style = "bold" if n else "dim"
+            branch = node.add(f"[{style}]{c['name']}[/{style}] [dim]{c['id']} ({n})[/dim]")
+            if series:
+                for r in by_concept.get(c["id"], []):
+                    branch.add(label(r))
+            add(branch, c["id"])
+
+    root = Tree("[bold]tempus ontology[/bold]")
+    add(root, None)
+    if by_concept.get(None):
+        misfit = root.add("[yellow]No fit (consider a new branch)[/yellow]")
+        for r in by_concept[None]:
+            misfit.add(label(r))
+    if unplaced:
+        pending = root.add("[yellow]Not filed yet[/yellow] [dim](tempus ontology file)[/dim]")
+        for r in unplaced:
+            pending.add(f"[cyan]{r['series_id']}[/cyan] [dim]{(r['title'] or '')[:60]}[/dim]")
+    console.print(root)

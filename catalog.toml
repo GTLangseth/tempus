@@ -1,5 +1,8 @@
 # Series that `tempus sync` keeps up to date.
 # Add with `tempus catalog add fred <SERIES_ID>` or edit by hand.
+# Optional `concept = "<dotted.id>"` pins a series in the ontology, overriding auto filing.
+
+# --- Headline indicators -----------------------------------------------------
 
 [[series]]
 source = "fred"
@@ -16,3 +19,103 @@ id = "GDP"      # Gross Domestic Product
 [[series]]
 source = "fred"
 id = "DGS10"    # 10-Year Treasury Constant Maturity Rate
+
+# --- Commodities: energy -----------------------------------------------------
+
+[[series]]
+source = "fred"
+id = "DCOILWTICO"   # Crude Oil: WTI (daily)
+
+[[series]]
+source = "fred"
+id = "DCOILBRENTEU" # Crude Oil: Brent (daily)
+
+[[series]]
+source = "fred"
+id = "DHHNGSP"      # Henry Hub Natural Gas Spot (daily)
+
+[[series]]
+source = "fred"
+id = "PNRGINDEXM"   # IMF Global Energy Price Index
+
+# --- Commodities: agriculture ------------------------------------------------
+
+[[series]]
+source = "fred"
+id = "PCOFFOTMUSDM" # Coffee, Other Mild Arabica
+
+[[series]]
+source = "fred"
+id = "PCOFFROBUSDM" # Coffee, Robustas
+
+[[series]]
+source = "fred"
+id = "PCOCOUSDM"    # Cocoa
+
+[[series]]
+source = "fred"
+id = "PSUGAISAUSDM" # Sugar No. 11
+
+[[series]]
+source = "fred"
+id = "PWHEAMTUSDM"  # Wheat
+
+[[series]]
+source = "fred"
+id = "PMAIZMTUSDM"  # Corn
+
+[[series]]
+source = "fred"
+id = "PBEEFUSDM"    # Beef
+
+[[series]]
+source = "fred"
+id = "PFOODINDEXM"  # IMF Global Food Price Index
+
+# --- Commodities: metals and broad -------------------------------------------
+
+[[series]]
+source = "fred"
+id = "PCOPPUSDM"     # Copper
+
+[[series]]
+source = "fred"
+id = "PALUMUSDM"     # Aluminum
+
+[[series]]
+source = "fred"
+id = "PALLFNFINDEXM" # IMF Global Price Index of All Commodities
+
+# --- Consumer prices: where commodities land ---------------------------------
+
+[[series]]
+source = "fred"
+id = "CPILFESL"       # Core CPI (less food & energy)
+
+[[series]]
+source = "fred"
+id = "CPIENGSL"       # CPI: Energy
+
+[[series]]
+source = "fred"
+id = "CUSR0000SETB01" # CPI: Gasoline (all types)
+
+[[series]]
+source = "fred"
+id = "GASREGW"        # US Regular Gasoline Retail Price (weekly, $/gal)
+
+[[series]]
+source = "fred"
+id = "CPIUFDSL"       # CPI: Food
+
+[[series]]
+source = "fred"
+id = "CUSR0000SAF11"  # CPI: Food at Home
+
+[[series]]
+source = "fred"
+id = "CUSR0000SEFP01" # CPI: Coffee
+
+[[series]]
+source = "fred"
+id = "APU0000717311"  # Average Retail Price: Ground Coffee ($/lb)
