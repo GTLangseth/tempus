@@ -626,3 +626,14 @@ def card_panels(name: str | None = typer.Argument(None)):
             f"[bold]{p.name}[/bold] ({p.field}: {accepts_text(p)})\n  {p.doc}\n"
             f"  [yellow]Not for:[/yellow] {p.when_not}"
         )
+
+
+@app.command()
+def serve(port: int = typer.Option(8765), host: str = typer.Option("127.0.0.1")):
+    """Run the tempus app: browse concepts and cards, with live reload on save."""
+    import uvicorn
+
+    from tempus.app import create_app
+
+    console.print(f"tempus → [bold]http://{host}:{port}[/bold]")
+    uvicorn.run(create_app(), host=host, port=port, log_level="warning")
