@@ -196,16 +196,21 @@ def series_list():
             ORDER BY s.source, s.series_id
             """
         ).fetchall()
-    table = Table("series", "title", "freq", "points", "range", "synced")
+    table = Table()
+    for name in ("series", "freq", "points", "range", "synced"):
+        table.add_column(name, no_wrap=True)
+    # The title gets whatever width is left (up to 48), truncated rather than wrapped.
+    title_width = min(48, max(12, console.width - 80))  # ~80 cols for the fixed columns
+    table.add_column("title", no_wrap=True, overflow="ellipsis", max_width=title_width)
     for r in rows:
-        span = f"{r['first']:%Y-%m-%d} → {r['last']:%Y-%m-%d}" if r["first"] else "—"
+        span = f"{r['first']:%Y-%m}–{r['last']:%Y-%m}" if r["first"] else "—"
         table.add_row(
             f"{r['source']}:{r['series_id']}",
-            (r["title"] or "")[:50],
             r["frequency"] or "",
             str(r["n"]),
             span,
             _fmt(r["last_synced_at"]),
+            r["title"] or "",
         )
     console.print(table)
 
@@ -245,7 +250,7 @@ def series_show(
     console.print(f"[bold]{meta['title']}[/bold]  [dim]{meta['units']} · {meta['frequency']}[/dim]")
     # Downsample to terminal width for the sparkline
     width = max(10, console.width - 2)
-    step = max(1, len(values) // width)
+    step = max(1, -(-len(values) // width))  # ceil, so the line never wraps
     console.print(_sparkline(values[::step]))
     table = Table("date", "value")
     for r in reversed(recent):
