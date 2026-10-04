@@ -10,7 +10,17 @@ from datetime import date
 
 import polars as pl
 
-from tempus.cards.values import FREQ_ORDER, FREQS, EvalError, Series, SeriesSet, Value
+from tempus.cards.values import (
+    FREQ_ORDER,
+    FREQS,
+    EvalError,
+    Series,
+    SeriesSet,
+    Table,
+    Value,
+    align,
+    resample_hint,
+)
 
 REQUIRED = object()
 TRUNCATE = {"D": "1d", "W": "1w", "M": "1mo", "Q": "1q", "Y": "1y"}
@@ -265,5 +275,241 @@ register(
         "Natural log.",
         "Needs positive values. Differences of logs ≈ percent changes for small moves.",
         _log,
+    )
+)
+
+
+# --- smoothing and normalization --------------------------------------------------------
+
+
+def _rolling(x: Series, n: int, agg: str) -> Series:
+    v = pl.col("value")
+    expr = {
+        "mean": v.rolling_mean(window_size=n),
+        "sum": v.rolling_sum(window_size=n),
+        "min": v.rolling_min(window_size=n),
+        "max": v.rolling_max(window_size=n),
+        "std": v.rolling_std(window_size=n),
+    }[agg]
+    return _with(x, expr, f"{x.label}, {n}-period rolling {agg}")
+
+
+def _ewm(x: Series, span: int) -> Series:
+    return _with(x, pl.col("value").ewm_mean(span=span), f"{x.label}, EWM span {span}")
+
+
+def _rebase(x: Series, at: date, to: float) -> Series:
+    base = x.df.filter((pl.col("ts") >= at) & pl.col("value").is_not_null()).head(1)
+    if base.is_empty():
+        raise EvalError(f"rebase: '{x.name}' has no value at or after {at}")
+    b = base["value"][0]
+    if b == 0:
+        raise EvalError(f"rebase: '{x.name}' is 0 at {base['ts'][0]}")
+    return _with(x, pl.col("value") / b * to, f"{x.label}, {base['ts'][0]} = {to:g}")
+
+
+def _zscore(x: Series, window: int | None) -> Series:
+    v = pl.col("value")
+    if window:
+        expr = (v - v.rolling_mean(window_size=window)) / v.rolling_std(window_size=window)
+    else:
+        expr = (v - v.mean()) / v.std()
+    return _with(x, expr, f"{x.label}, z-score")
+
+
+# --- across a set -----------------------------------------------------------------------
+
+
+def _set_agg(how: str):
+    def impl(s: SeriesSet) -> Series:
+        if not s.members:
+            raise EvalError(f"{how}: '{s.name}' has no members")
+        freqs = sorted({m.freq for m in s.members})
+        if len(freqs) > 1:
+            raise EvalError(
+                f"{how}: members of '{s.name}' have different frequencies ({', '.join(freqs)})",
+                hint="Resample the members first.",
+            )
+        v = pl.col("value")
+        expr = {
+            "mean": v.mean(),
+            "sum": pl.when(v.count() > 0).then(v.sum()),
+            "min": v.min(),
+            "max": v.max(),
+        }[how]
+        df = pl.concat([m.df for m in s.members]).group_by("ts").agg(expr.alias("value"))
+        first = s.members[0]
+        return Series(s.name, f"{how} of {s.name}", first.freq, df.sort("ts"), first.units)
+
+    return impl
+
+
+# --- relationships ----------------------------------------------------------------------
+
+_LAG_UNIT = {"D": (1, "d"), "W": (1, "w"), "M": (1, "mo"), "Q": (3, "mo"), "Y": (1, "y")}
+
+
+def _lag1_autocorr(s: Series) -> float | None:
+    df = s.df.drop_nulls()
+    if df.height < 3:
+        return None
+    r = df.select(pl.corr(pl.col("value"), pl.col("value").shift(1))).item()
+    return None if r is None or r != r else r
+
+
+def _corr(x: Series, y: Series, window: int) -> Series:
+    df = align(x, y, f"corr({x.name}, {y.name})")
+    out = df.select(
+        "ts", pl.rolling_corr(pl.col("a"), pl.col("b"), window_size=window).alias("value")
+    )
+    return Series(x.name, f"{window}-period correlation: {x.label} vs {y.label}", x.freq, out)
+
+
+def _lagcorr(x: Series, y: Series, nlags: int) -> Table:
+    if x.freq != y.freq:
+        raise EvalError(
+            f"lagcorr({x.name}, {y.name}) — frequencies differ ({x.freq} vs {y.freq}).",
+            hint=resample_hint(x, y),
+        )
+    if x.freq == "irregular":
+        raise EvalError("lagcorr needs a regular frequency", hint='Resample first, e.g. "M"')
+    if nlags < 0:
+        raise EvalError("lagcorr: nlags must be 0 or more")
+    mult, unit = _LAG_UNIT[x.freq]
+    rows = []
+    for k in range(nlags + 1):
+        shifted = (
+            x.df if k == 0 else x.df.with_columns(pl.col("ts").dt.offset_by(f"{k * mult}{unit}"))
+        )
+        joined = shifted.join(y.df, on="ts", how="inner", suffix="_y").drop_nulls()
+        r = None
+        if joined.height >= 3:
+            r = joined.select(pl.corr("value", "value_y")).item()
+            r = None if r is None or r != r else r
+        rows.append({"lag": k, "r": r, "n": joined.height})
+    warnings = []
+    for s in (x, y):
+        ac = _lag1_autocorr(s)
+        if ac is not None and ac > 0.95:
+            warnings.append(
+                f"'{s.name}' looks trending in levels; correlations between trending "
+                "series are often spurious. Try yoy() or diff() first."
+            )
+    df = pl.DataFrame(rows, schema={"lag": pl.Int64, "r": pl.Float64, "n": pl.Int64})
+    meta = {"kind": "lagcorr", "x": x.label, "y": y.label, "freq": x.freq, "warnings": warnings}
+    return Table(x.name, df, meta)
+
+
+# --- arithmetic -------------------------------------------------------------------------
+
+_ARITH = {
+    "+": lambda a, b: a + b,
+    "-": lambda a, b: a - b,
+    "*": lambda a, b: a * b,
+    "/": lambda a, b: _safe_ratio(a, b),
+}
+
+
+def binop(op: str, left: Value, right: Value, what: str) -> Value:
+    if (
+        isinstance(left, Table)
+        or isinstance(right, Table)
+        or isinstance(left, str)
+        or isinstance(right, str)
+    ):
+        raise EvalError(f"{what} — tables and strings can't be used in arithmetic")
+    if isinstance(left, SeriesSet):
+        return SeriesSet(left.name, tuple(binop(op, m, right, what) for m in left.members))
+    if isinstance(right, SeriesSet):
+        return SeriesSet(right.name, tuple(binop(op, left, m, what) for m in right.members))
+    f = _ARITH[op]
+    if isinstance(left, Series) and isinstance(right, Series):
+        df = align(left, right, what)
+        out = df.select("ts", f(pl.col("a"), pl.col("b")).alias("value"))
+        return Series(left.name, what, left.freq, out)
+    if isinstance(left, Series):
+        return _with(left, f(pl.col("value"), pl.lit(right)), what)
+    if isinstance(right, Series):
+        return _with(right, f(pl.lit(left), pl.col("value")), what)
+    return f(left, right) if op != "/" else (None if right == 0 else left / right)
+
+
+register(
+    Function(
+        "rolling",
+        (X, Param("n", "int"), Param("agg", "str", "mean", ("mean", "sum", "min", "max", "std"))),
+        "same",
+        "Rolling statistic over the last n periods.",
+        "The first n-1 points are gaps. Smoothing delays turning points.",
+        _rolling,
+    )
+)
+register(
+    Function(
+        "ewm",
+        (X, Param("span", "int")),
+        "same",
+        "Exponentially weighted moving average.",
+        "Reacts faster than rolling(), but still lags turning points.",
+        _ewm,
+    )
+)
+register(
+    Function(
+        "rebase",
+        (X, Param("at", "date"), Param("to", "number", 100)),
+        "same",
+        "Index the series so its value at `at` equals `to` (default 100).",
+        "Uses the first observation at or after `at`. Rebasing makes series with "
+        "different units comparable without dual axes.",
+        _rebase,
+    )
+)
+register(
+    Function(
+        "zscore",
+        (X, Param("window", "int", None)),
+        "same",
+        "Standardize: (x − mean) / std, over the full history or a rolling window.",
+        "Full-history z-scores use future data at every point: fine for "
+        "comparison, wrong for signals.",
+        _zscore,
+    )
+)
+for _how in ("mean", "sum", "min", "max"):
+    register(
+        Function(
+            _how,
+            (Param("s", "set"),),
+            "series",
+            f"{_how} across a set's members.",
+            "Dates where some members are missing use the members present, which "
+            "can make sums jump.",
+            _set_agg(_how),
+            broadcast=False,
+        )
+    )
+register(
+    Function(
+        "corr",
+        (X, Param("y", "series"), Param("window", "int")),
+        "series",
+        "Rolling Pearson correlation between two series.",
+        "Trending series correlate spuriously; correlate yoy() or diff() instead.",
+        _corr,
+        broadcast=False,
+    )
+)
+register(
+    Function(
+        "lagcorr",
+        (X, Param("y", "series"), Param("nlags", "int", 12)),
+        "lagcorr",
+        "Correlation of x and y at lags 0..nlags. Positive lag k means x leads y by k periods.",
+        "Uses only points inside the card window. Trending levels correlate "
+        "spuriously; use yoy() or diff() first.",
+        _lagcorr,
+        broadcast=False,
+        windowed=True,
     )
 )
