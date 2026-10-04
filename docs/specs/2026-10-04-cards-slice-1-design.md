@@ -1,6 +1,6 @@
 # Cards, slice 1: language, engine and a minimal app
 
-- **Status:** Draft, in review (approved when this PR merges)
+- **Status:** Approved 2026-10-04 (PR #1)
 - **Linear:** SPA-25 (card language v0). Resolves SPA-26 (where derived transforms live).
   Supersedes SPA-23 (Next.js scaffold).
 - **Horizon:** 2 · Cards (see `docs/SOUL.md`)

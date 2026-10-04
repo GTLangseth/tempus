@@ -113,6 +113,8 @@ evaluating it.
 | TimescaleDB schema guidance | Apache-2.0 docs | Ideas | Narrow, medium and wide table patterns | — | `observations`, the [Storage](#storage) section |
 | Amazon's one-way and two-way doors | — | Ideas | Decide fast on reversible choices; slow down on irreversible ones | — | Principle 8, Open decisions |
 | Cleveland & McGill (graphical perception) | — | Ideas | Position beats length, which beats angle and area; caution with dual axes | — | Panel catalog entries |
+| [Entire](https://docs.entire.io/) | CLI: MIT | Evaluated, not adopted | Commits paired with the agent session behind them (checkpoints), for tracing code back to why | Adopting now: a platform to run for a solo project whose rationale already lives in curated docs. Revisit when other contributors or several parallel agents work in the repo | Decision recall |
+| claude-mem | Apache-2.0 | Evaluated, removed | — | Memory is per-machine and not shareable; compression costs LLM calls; its hooks timed out and slowed every command in practice. The curated docs plus native Claude memory cover recall | Decision recall |
 | Jevbox | — | Ideas | Top-down filing, one choice per level, with a "none of these" option | — | Ontology filing |
 
 ## Storage
