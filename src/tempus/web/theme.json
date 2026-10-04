@@ -1,15 +1,27 @@
 {
+  "_source": "Tokens mirror docs/DESIGN.md (Neon Notebook). Change them there first.",
   "color": {
-    "bg": "#0f1115", "panel": "#171a21", "border": "#262b36", "text": "#e6e8ee",
-    "muted": "#8b93a7", "grid": "#262b36", "accent": "#7aa2f7",
-    "error": "#f7768e", "warning": "#e0af68",
-    "series": ["#7aa2f7", "#e0af68", "#9ece6a", "#f7768e", "#bb9af7", "#7dcfff"]
+    "canvas": "#f2efe6",
+    "paper": "#fbf9f3",
+    "grid": "#e2ddcf",
+    "hairline": "#d4cfbf",
+    "ink": "#1c1b19",
+    "graphite": "#4a4843",
+    "pencil": "#6b675e",
+    "primary": "#ff1f8f",
+    "neon-orange": "#ff5a1f",
+    "neon-violet": "#8b3dff",
+    "neon-cyan": "#00a3e8",
+    "neon-green": "#00b860",
+    "highlight-lime": "#b6ff00",
+    "highlight-yellow": "#fff200",
+    "series": ["#ff1f8f", "#00a3e8", "#ff5a1f", "#8b3dff", "#00b860"]
   },
   "font": {
-    "family": "Inter, system-ui, -apple-system, sans-serif",
-    "mono": "ui-monospace, SFMono-Regular, Menlo, monospace",
-    "size": 13
+    "display": "\"Space Grotesk\", system-ui, sans-serif",
+    "body": "Inter, system-ui, sans-serif",
+    "mono": "\"JetBrains Mono\", ui-monospace, monospace"
   },
-  "space": 8,
-  "radius": 8
+  "rounded": { "sm": 4, "md": 8 },
+  "grid": 24
 }
