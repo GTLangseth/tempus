@@ -1,0 +1,24 @@
+version: 1
+title: Crude oil → gasoline CPI pass-through
+question: Does a move in crude show up in gasoline CPI, and how fast?
+notes: |
+  First pass (2000+): YoY r ≈ 0.88 at a 1-month lag. Pass-through to core CPI is weak (r ≈ 0.30).
+tags: [energy, pass-through]
+concepts: [prices.commodities.energy, prices.consumer.energy]
+window: {start: 2000-01-01}
+
+inputs:
+  crude:    {series: fred:DCOILWTICO, label: Crude oil (WTI)}
+  gasoline: {series: fred:CUSR0000SETB01, label: CPI gasoline}
+
+formulas:
+  crude_yoy:    yoy(resample(crude, "M", "mean"))
+  gasoline_yoy: yoy(gasoline)
+  passthrough:  lagcorr(crude_yoy, gasoline_yoy, nlags=12)
+
+panels:
+  - type: timeseries
+    title: YoY change
+    y: [crude_yoy, gasoline_yoy]
+  - type: lagcorr
+    data: passthrough

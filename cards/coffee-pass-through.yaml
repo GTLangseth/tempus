@@ -1,0 +1,24 @@
+version: 1
+title: Arabica → CPI coffee pass-through
+question: How long does a move in arabica prices take to reach the coffee aisle?
+notes: |
+  First pass (2000+): YoY r ≈ 0.82 at a 7-month lag.
+tags: [agriculture, pass-through]
+concepts: [prices.commodities.agriculture, prices.consumer.food]
+window: {start: 2000-01-01}
+
+inputs:
+  arabica:    {series: fred:PCOFFOTMUSDM, label: Arabica (other milds)}
+  cpi_coffee: {series: fred:CUSR0000SEFP01, label: CPI coffee}
+
+formulas:
+  arabica_yoy: yoy(arabica)
+  coffee_yoy:  yoy(cpi_coffee)
+  passthrough: lagcorr(arabica_yoy, coffee_yoy, nlags=12)
+
+panels:
+  - type: timeseries
+    title: YoY change
+    y: [arabica_yoy, coffee_yoy]
+  - type: lagcorr
+    data: passthrough

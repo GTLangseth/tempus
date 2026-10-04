@@ -71,7 +71,7 @@ run = "uv run pytest"
 
 [tasks.lint]
 description = "Lint and format-check"
-run = ["uv run ruff check .", "uv run ruff format --check ."]
+run = ["uv run ruff check .", "uv run ruff format --check .", "uv run tempus card check --offline"]
 
 [tasks.fmt]
 description = "Auto-format and fix lint"

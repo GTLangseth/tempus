@@ -30,6 +30,8 @@ app.add_typer(catalog_app, name="catalog")
 app.add_typer(series_app, name="series")
 app.add_typer(fred_app, name="fred")
 app.add_typer(ontology_app, name="ontology")
+card_app = typer.Typer(help="Cards: saved views over series (cards/*.yaml).", no_args_is_help=True)
+app.add_typer(card_app, name="card")
 
 console = Console()
 SPARK = "▁▂▃▄▅▆▇█"
@@ -437,3 +439,190 @@ def ontology_tree(
         for r in unplaced:
             pending.add(f"[cyan]{r['series_id']}[/cyan] [dim]{(r['title'] or '')[:60]}[/dim]")
     console.print(root)
+
+
+CARD_TEMPLATE = """\
+version: 1
+title: {title}
+question: What are you trying to find out?
+# notes: |
+#   Findings so far.
+tags: []
+concepts: []                      # e.g. [prices.consumer.energy]
+window: {{start: 2000-01-01}}
+
+inputs:
+  x: fred:UNRATE                  # source:series_id, or {{concept: labor}}
+
+formulas:
+  x_yoy: diff(x, 12)              # see `tempus card functions`
+
+panels:                           # see `tempus card panels`
+  - type: timeseries
+    y: [x, x_yoy]
+"""
+
+
+def _cards():
+    from tempus.cards.repository import FileCardRepository
+
+    return FileCardRepository(get_settings().cards_path)
+
+
+def _print_card_errors(errors) -> None:
+    from rich.markup import escape
+
+    for e in errors:
+        color = "red" if e.level == "error" else "yellow"
+        console.print(f"[{color}]{escape(e.format())}[/{color}]")  # paths contain [0]
+
+
+@card_app.command("list")
+def card_list():
+    """List cards with their title, panel count, concepts and tags."""
+    repo = _cards()
+    table = Table("id", "title", "panels", "concepts", "tags")
+    for card_id in repo.ids():
+        card, errors = repo.get(card_id)
+        if card is None:
+            table.add_row(card_id, "[red]invalid[/red]", "", "", "")
+            continue
+        table.add_row(
+            card_id,
+            card.title,
+            str(len(card.panels)),
+            ", ".join(card.concepts),
+            ", ".join(card.tags),
+        )
+    console.print(table)
+
+
+@card_app.command("new")
+def card_new(card_id: str):
+    """Write a commented template to cards/<id>.yaml."""
+    from tempus.cards.spec import CARD_ID
+
+    if not CARD_ID.fullmatch(card_id):
+        console.print("[red]Card ids are kebab-case, e.g. crude-to-gasoline[/red]")
+        raise typer.Exit(1)
+    path = _cards().path(card_id)
+    if path.exists():
+        console.print(f"[red]{path} already exists[/red]")
+        raise typer.Exit(1)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(CARD_TEMPLATE.format(title=card_id.replace("-", " ").capitalize()))
+    console.print(f"Wrote [bold]{path}[/bold]")
+
+
+@card_app.command("check")
+def card_check(
+    card_id: str | None = typer.Argument(None, help="One card; all cards if omitted"),
+    offline: bool = typer.Option(False, help="Static checks only, no database"),
+):
+    """Validate cards. Exits 1 if any card has errors."""
+    from tempus.cards.check import check_card
+    from tempus.cards.errors import has_errors
+    from tempus.cards.resolve import resolve
+
+    repo = _cards()
+    ids = [card_id] if card_id else repo.ids()
+    conn = None if offline else _connect()
+    failed = False
+    for cid in ids:
+        card, errors = repo.get(cid)
+        if card is not None:
+            errors += check_card(cid, card)[1]
+            if conn is not None and not has_errors(errors):
+                errors += resolve(conn, cid, card)[1]
+        _print_card_errors(errors)
+        if has_errors(errors):
+            failed = True
+        else:
+            console.print(f"[green]✓[/green] {cid}")
+    if conn is not None:
+        conn.close()
+    if failed:
+        raise typer.Exit(1)
+
+
+@card_app.command("show")
+def card_show(
+    card_id: str,
+    start: datetime | None = typer.Option(None, formats=["%Y-%m-%d"]),
+    end: datetime | None = typer.Option(None, formats=["%Y-%m-%d"]),
+    as_json: bool = typer.Option(False, "--json", help="Print the panel payloads"),
+):
+    """Evaluate a card. Prints a summary, or the panel payloads with --json."""
+    import json
+
+    from tempus.cards.errors import has_errors
+    from tempus.cards.run import run_card
+
+    with _connect() as conn:
+        result = run_card(conn, _cards(), card_id, start and start.date(), end and end.date())
+    if as_json:
+        print(json.dumps(result.to_dict(), default=str, indent=2))
+        raise typer.Exit(1 if has_errors(result.errors) else 0)
+    _print_card_errors(result.errors)
+    for p in result.payloads:
+        console.print(f"\n[bold]{p['title'] or p['type']}[/bold]")
+        if p["type"] == "lagcorr" and p["annotations"]:
+            peak = p["annotations"]["peak"]
+            console.print(f"  {p['annotations']['lead']} (r = {peak['r']:.3f})")
+        elif p["type"] == "stat" and p["stat"]:
+            console.print(f"  {p['stat']['value']:.4g} on {p['stat']['date']}")
+        for s in p["series"]:
+            vals = [v for _, v in s["points"] if v is not None]
+            if vals:
+                console.print(
+                    f"  {s['label']:<40} {_sparkline(vals[-40:])} "
+                    f"{vals[-1]:.4g} ({s['points'][-1][0]})"
+                )
+    if has_errors(result.errors):
+        raise typer.Exit(1)
+
+
+@card_app.command("load")
+def card_load():
+    """Sync cards/*.yaml into the cards index table."""
+    from tempus.cards.repository import sync_index
+
+    with _connect() as conn:
+        loaded, errors = sync_index(conn, _cards())
+    _print_card_errors(errors)
+    console.print(f"Loaded {loaded} card(s)")
+
+
+@card_app.command("functions")
+def card_functions(name: str | None = typer.Argument(None)):
+    """The function catalog, or one entry with its caveat."""
+    from tempus.cards.functions import CATALOG, signature
+
+    if name:
+        fn = CATALOG.get(name)
+        if fn is None:
+            console.print(f"[red]Unknown function '{name}'[/red]")
+            raise typer.Exit(1)
+        console.print(
+            f"[bold]{signature(fn)}[/bold] → {fn.returns}\n{fn.doc}\n"
+            f"[yellow]Caveat:[/yellow] {fn.caveat}"
+        )
+        return
+    table = Table("function", "returns", "what it does")
+    for fn in CATALOG.values():
+        table.add_row(signature(fn), fn.returns, fn.doc)
+    console.print(table)
+
+
+@card_app.command("panels")
+def card_panels(name: str | None = typer.Argument(None)):
+    """The panel catalog."""
+    from tempus.cards.panels import PANELS, accepts_text
+
+    for p in PANELS.values():
+        if name and p.name != name:
+            continue
+        console.print(
+            f"[bold]{p.name}[/bold] ({p.field}: {accepts_text(p)})\n  {p.doc}\n"
+            f"  [yellow]Not for:[/yellow] {p.when_not}"
+        )
