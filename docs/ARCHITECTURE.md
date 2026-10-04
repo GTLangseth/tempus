@@ -42,6 +42,7 @@ and the quarterly review procedure live in [`STACK.md`](STACK.md).
 | Cards | ✅ built | `cards/`, `src/tempus/cards/` | Card language v1 (inputs, formulas, panels), static checks, Polars engine, panel payloads |
 | App | ✅ built | `src/tempus/app.py`, `src/tempus/explore.py`, `src/tempus/web/` | `tempus serve`: FastAPI engine API + no-build static front end (ECharts, three.js), hot reload |
 | Web front end | ✅ explore, series and cards views | see App | Explore (default): the concept tree in 3D with natural-language search, or an outline on small screens. Series pages: an implicit single-series card. Cards: saved cards, hot-reloaded |
+| Design system | ✅ adopted | `docs/DESIGN.md`, `docs/design/` | Visual tokens and rules for every surface (design.md format); `docs/design/` holds the reference candidates, a static preview and a playground for choosing options. `src/tempus/web/theme.json` mirrors its tokens |
 
 ## Data flow
 
@@ -203,6 +204,14 @@ Newest first. Each entry: what we chose, and why.
   series pages and saved cards share payloads and adapters, and nothing is written to
   `cards/`.
 
+- **2026-10-04 · The visual language is "Neon Notebook", kept in `docs/DESIGN.md`.** A calm
+  cream graph-paper canvas with ink text and sticker-style cards, so that a few hot neon
+  numbers and chart lines draw the eye. It combines two reference styles (a cream
+  sketchbook and a lab-label monospace voice) and was tuned in a playground. The file uses
+  Google's design.md format: tokens in YAML front matter, reasons in prose, linted by
+  `mise run design:lint`. That lets agents and `theme.json` (the app's tokens) read one source.
+  Because the hotter neons trade away contrast, only pink and violet may set type; cyan,
+  orange and green are limited to labeled chart marks.
 - **2026-10-04 · Cards are evaluated in a Python engine; the web app reads through it.**
   This reverses "the web app reads TimescaleDB directly": cards are the shared logic that
   decision said would trigger a revisit. `tempus serve` (FastAPI) returns renderer-neutral

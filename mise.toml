@@ -81,6 +81,10 @@ run = "uv run pytest"
 description = "Lint and format-check"
 run = ["uv run ruff check .", "uv run ruff format --check .", "uv run tempus card check --offline"]
 
+[tasks."design:lint"]
+description = "Validate docs/DESIGN.md against the design.md format"
+run = "npx -y @google/design.md@0.4.0 lint docs/DESIGN.md"
+
 [tasks.fmt]
 description = "Auto-format and fix lint"
 run = ["uv run ruff format .", "uv run ruff check --fix ."]

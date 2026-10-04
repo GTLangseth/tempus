@@ -1,0 +1,139 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Neon Notebook preview</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@600;700&family=Inter:wght@400;500&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+<style>
+  /* Tokens mirror docs/DESIGN.md */
+  :root {
+    --canvas: #f2efe6; --paper: #fbf9f3; --grid: #e2ddcf; --hairline: #d4cfbf;
+    --ink: #1c1b19; --graphite: #4a4843; --pencil: #6b675e;
+    --pink: #ff1f8f; --orange: #ff5a1f; --violet: #8b3dff; --cyan: #00a3e8; --green: #00b860;
+    --lime: #b6ff00; --yellow: #fff200;
+    --display: "Space Grotesk", system-ui, sans-serif;
+    --body: Inter, system-ui, sans-serif;
+    --mono: "JetBrains Mono", ui-monospace, monospace;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; color: var(--ink); font: 400 16px/1.55 var(--body);
+    background-color: var(--canvas);
+    background-image:
+      linear-gradient(var(--grid) 1px, transparent 1px),
+      linear-gradient(90deg, var(--grid) 1px, transparent 1px);
+    background-size: 24px 24px;
+  }
+  main { max-width: 960px; margin: 0 auto; padding: 64px 16px; display: grid; gap: 40px; }
+  .label { font: 500 11px/1.4 var(--mono); letter-spacing: .06em; text-transform: uppercase;
+           color: var(--pencil); font-feature-settings: "calt" 0, "liga" 0; }
+  header h1 { font: 700 72px/.95 var(--display); letter-spacing: -.03em; margin: 8px 0 16px; }
+  header h1 .neon { color: var(--pink); }
+  header p { color: var(--graphite); max-width: 52ch; margin: 0; }
+  .card { background: var(--paper); border: 1px solid var(--ink); border-radius: 8px;
+          box-shadow: 3px 3px 0 var(--ink); padding: 24px; display: grid; gap: 16px; }
+  .card h2 { font: 700 36px/1.05 var(--display); letter-spacing: -.03em; margin: 0; }
+  /* Lower-half marker swipe */
+  mark { background: linear-gradient(transparent 52%, var(--lime) 52%, var(--lime) 92%, transparent 92%);
+         color: var(--ink); padding: 0 .1em; -webkit-box-decoration-break: clone; box-decoration-break: clone; }
+  .dot { display: inline-block; width: .5em; height: .5em; border-radius: 50%; margin-right: .25em;
+         vertical-align: .18em; border: 1.5px solid var(--ink); }
+  .stats { display: flex; gap: 32px; flex-wrap: wrap; align-items: baseline; }
+  .stat b { display: block; font: 700 40px/1 var(--mono); letter-spacing: -.02em; }
+  .notes { font-size: 14px; color: var(--graphite); margin: 0; }
+  .foot { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+  .chip { font: 500 11px/1 var(--mono); letter-spacing: .06em; text-transform: uppercase;
+          border: 1px solid var(--hairline); border-radius: 9999px; padding: 5px 10px; background: var(--paper); }
+  .btn { font: 500 14px var(--body); background: var(--ink); color: var(--paper); border: 0;
+         border-radius: 4px; padding: 10px 18px; cursor: pointer; margin-left: auto; }
+  .btn:hover { background: var(--violet); }
+  svg { width: 100%; height: auto; display: block; overflow: visible; }
+  svg text { font: 500 10px var(--mono); fill: var(--pencil); letter-spacing: .04em; }
+  .swatches { display: grid; grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); gap: 8px; }
+  .sw { border: 1px solid var(--hairline); border-radius: 10px; overflow: hidden; background: var(--paper); }
+  .sw i { display: block; height: 44px; }
+  .sw span { display: block; padding: 6px 8px; }
+  @media (max-width: 560px) { header h1 { font-size: 48px; } .card h2 { font-size: 28px; } }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <div class="label">tempus · design preview · sample data</div>
+    <h1>Neon <span class="neon">Notebook</span></h1>
+    <p>A quiet graph-paper page with neon type and lines that pull the eye. The cards below use made-up numbers to show the style. They are not real series.</p>
+  </header>
+
+  <article class="card">
+    <div class="label">Energy / Prices · Monthly · Pinned</div>
+    <h2>Does a move in crude show up in <mark>gasoline CPI</mark>, and how fast?</h2>
+    <div class="stats">
+      <div class="stat"><b style="color:var(--pink)">2 mo</b><span class="label">peak lag · r = 0.81</span></div>
+      <div class="stat"><b><span class="dot" style="background:var(--cyan)"></span>↑ 4.2%</b><span class="label">gasoline cpi · yoy</span></div>
+    </div>
+    <svg viewBox="0 0 640 220" role="img" aria-label="Sample chart: crude and gasoline CPI indexes over 24 months">
+      <g stroke="var(--grid)" stroke-width="1">
+        <line x1="0" x2="640" y1="20" y2="20"/><line x1="0" x2="640" y1="80" y2="80"/>
+        <line x1="0" x2="640" y1="140" y2="140"/><line x1="0" x2="640" y1="200" y2="200"/>
+      </g>
+      <polyline fill="none" stroke="var(--pink)" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"
+        points="0,150 27,138 54,120 81,96 108,70 135,62 162,80 189,104 216,126 243,140 270,132 297,112 324,90 351,74 378,66 405,78 432,98 459,116 486,108 513,88 540,64 567,48 594,40 620,44"/>
+      <polyline fill="none" stroke="var(--cyan)" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"
+        points="0,170 27,166 54,160 81,148 108,130 135,108 162,98 189,106 216,124 243,140 270,150 297,144 324,128 351,108 378,92 405,86 432,96 459,112 486,124 513,118 540,100 567,82 594,66 620,58"/>
+      <circle cx="620" cy="44" r="4" fill="var(--pink)" stroke="var(--ink)" stroke-width="1.5"/>
+      <circle cx="620" cy="58" r="4" fill="var(--cyan)" stroke="var(--ink)" stroke-width="1.5"/>
+      <text x="0" y="216">OCT 24</text><text x="300" y="216">OCT 25</text><text x="584" y="216">OCT 26</text>
+      <text x="0" y="14">INDEX · 2024-10 = 100</text>
+    </svg>
+    <div class="foot">
+      <span class="chip" style="border-color:var(--pink)">● crude · wti</span>
+      <span class="chip" style="border-color:var(--cyan)">● cpi · gasoline</span>
+      <span class="chip">fred</span>
+      <button class="btn">Open card</button>
+    </div>
+  </article>
+
+  <article class="card">
+    <div class="label">Food / Prices · Monthly</div>
+    <h2>Is the coffee spike reaching <mark>the grocery shelf</mark> yet?</h2>
+    <div class="stats">
+      <div class="stat"><b style="color:var(--violet)">↑ 6.1%</b><span class="label">cpi · coffee · 12 mo</span></div>
+      <div class="stat"><b><span class="dot" style="background:var(--orange)"></span>↑ 38%</b><span class="label">arabica futures · 12 mo</span></div>
+    </div>
+    <svg viewBox="0 0 640 160" role="img" aria-label="Sample bar chart: monthly change in coffee CPI">
+      <line x1="0" x2="640" y1="120" y2="120" stroke="var(--hairline)"/>
+      <g fill="var(--violet)">
+        <rect x="8" y="112" width="36" height="8" rx="2"/><rect x="60" y="106" width="36" height="14" rx="2"/>
+        <rect x="112" y="116" width="36" height="4" rx="2"/><rect x="164" y="100" width="36" height="20" rx="2"/>
+        <rect x="216" y="92" width="36" height="28" rx="2"/><rect x="268" y="96" width="36" height="24" rx="2"/>
+        <rect x="320" y="80" width="36" height="40" rx="2"/><rect x="372" y="70" width="36" height="50" rx="2"/>
+        <rect x="424" y="74" width="36" height="46" rx="2"/><rect x="476" y="56" width="36" height="64" rx="2"/>
+        <rect x="528" y="40" width="36" height="80" rx="2"/>
+      </g>
+      <rect x="580" y="24" width="36" height="96" rx="2" fill="var(--orange)"/>
+      <text x="0" y="140">NOV</text><text x="580" y="140">OCT</text><text x="0" y="12">M/M CHANGE · BPS</text>
+    </svg>
+    <p class="notes">Pass-through usually takes six to nine months. The latest bar, in orange, is the largest monthly move in the sample.</p>
+    <div class="foot"><span class="chip" style="border-color:var(--violet)">● cpi · coffee</span><span class="chip" style="border-color:var(--orange)">● latest month</span><span class="chip">fred</span><span class="chip">bls</span></div>
+  </article>
+
+  <section class="card">
+    <div class="label">Palette</div>
+    <div class="swatches">
+      <div class="sw"><i style="background:var(--pink)"></i><span class="label">primary</span></div>
+      <div class="sw"><i style="background:var(--cyan)"></i><span class="label">cyan</span></div>
+      <div class="sw"><i style="background:var(--orange)"></i><span class="label">orange</span></div>
+      <div class="sw"><i style="background:var(--violet)"></i><span class="label">violet</span></div>
+      <div class="sw"><i style="background:var(--green)"></i><span class="label">green</span></div>
+      <div class="sw"><i style="background:var(--lime)"></i><span class="label">lime mark</span></div>
+      <div class="sw"><i style="background:var(--yellow)"></i><span class="label">yellow mark (alt)</span></div>
+      <div class="sw"><i style="background:var(--ink)"></i><span class="label">ink</span></div>
+      <div class="sw"><i style="background:var(--canvas)"></i><span class="label">canvas</span></div>
+    </div>
+  </section>
+</main>
+</body>
+</html>
