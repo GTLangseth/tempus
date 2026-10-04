@@ -1,6 +1,7 @@
 import re
 import time
 from datetime import datetime
+from pathlib import Path
 
 import typer
 from rich.console import Console
@@ -130,6 +131,29 @@ def catalog_add(
         if sync:
             with _connect() as conn:
                 _print_result(sync_series(conn, src, series_id))
+
+
+@catalog_app.command("import-snapshot")
+def catalog_import_snapshot(
+    path: Path = typer.Argument(..., help="e.g. data/fred/series-snapshot.json"),
+    source: str = typer.Option("fred"),
+):
+    """Load series metadata from a snapshot file into the database (no observations).
+
+    Browsable in `tempus serve` right away; catalog.toml is unchanged. Run
+    `tempus ontology load` next to place them using ontology/placements.draft.yaml.
+    """
+    from tempus.snapshot import SnapshotError, import_snapshot
+
+    with _connect() as conn:
+        try:
+            inserted, refreshed = import_snapshot(conn, path, source)
+        except (SnapshotError, OSError, ValueError) as exc:
+            console.print(f"[red]{exc}[/red]")
+            raise typer.Exit(1) from exc
+    console.print(
+        f"[green]{inserted} series added[/green], {refreshed} refreshed (synced ones kept)"
+    )
 
 
 @catalog_app.command("remove")
