@@ -27,7 +27,8 @@ surfaces include the MCP server (SPA-29), dashboards and signals.
 
 Dashboards and layouts; the MCP server (SPA-29); forecasting functions; abstract
 `{ metric: … }` references; Lightweight Charts; saving a card from the UI (cards are edited
-as files); signals; vintages; pushing evaluation down to SQL.
+as files); signals; vintages; pushing evaluation down to SQL; label-aware checks that reject unsafe
+transforms (e.g. `yoy` on a rate), which arrive once series labels exist (SPA-18).
 
 ## Decisions this design rests on
 
