@@ -65,7 +65,7 @@ License key: **OSI** = open source · **SA** = source-available · **P** = propr
 | Catalog format | TOML via tomlkit | OSI | Reviewable in git; tomlkit keeps comments when editing | YAML | — |
 | Decision model (filing, resolving phrases to series IDs, series labels, card checks) | TypeSafe Jev (hosted API), pinned model version | P | Returns calibrated probabilities for decisions from a closed set, which the thresholds need; cheap. Usage rules: `ARCHITECTURE.md` → Using Jev | Local open-weight LLM with logprobs (e.g. via llama.cpp or vLLM), embedding similarity | An open model gives comparably calibrated choices; cost or availability becomes an issue |
 | Scheduler | `tempus sync --every` loop | n/a | Smallest thing that works for one source | cron or launchd, Dagster, Prefect | Several sources with dependencies, or a need for retries and alerting |
-| Web front end (planned) | Next.js | OSI | Reads Postgres directly; one less service | SvelteKit, Observable Framework, Evidence | Pages turn out mostly static and analytical (→ Observable Framework or Evidence) |
+| Web front end (planned) | No-build static app (HTML + ES modules) served by the engine's FastAPI server, with hot reload | OSI | Lightest loop for quick iteration: no Node toolchain or bundler. Borrows the validate + serve loop from dbt Charts | Next.js, SvelteKit, dbt Charts, Observable Framework, Evidence | The UI needs routing, state management or components beyond plain modules (→ SvelteKit or Next.js) |
 
 ## Open decisions
 
@@ -79,17 +79,40 @@ Status key: **Open** = undecided · **Provisional** = default in use, easy to ch
 
 | Decision | Status | Current lean | Door | Seam that insulates it | Settle when |
 |---|---|---|---|---|---|
-| Card expression language | Decided | Named inputs plus formula expressions, in the style of Grafana and Datadog | **One-way** once many cards exist | `version:` on every card file, plus a migrator; the expression parser is the only code that reads the syntax | — |
+| Card expression language | Decided | Named inputs plus formula expressions, in the style of Grafana and Datadog. A restricted subset of Python expressions, parsed with the standard library's `ast` and an allow-list (no Lark; it would only have served invented syntax) | **One-way** once many cards exist | `version:` on every card file, plus a migrator; the expression parser is the only code that reads the syntax | — |
 | Card references | Decided | Explicit series always allowed; concept expansion in v0; abstract metrics (Ossie-style) later, as an addition | Two-way, because references are additive | Reference resolver in the engine | When a second source exists for the same metric |
 | Panel grammar | Provisional | A closed panel catalog using Vega-Lite's encoding vocabulary (`x`, `y`, `color`, `mark`), with `type: vega` as the escape hatch | **One-way** once many cards exist | `version:` on cards; a catalog entry documents each type | Before the first ~10 cards are saved |
-| Chart renderers | Provisional | Lightweight Charts for market time series; ECharts for everything else; Vega-Lite for the escape hatch | Two-way | One renderer adapter per panel type, plus shared theme tokens | After the first web slice. AG Charts Enterprise is the alternative if a single paid family is preferred |
+| Chart renderers | Provisional | ECharts only for v0 (zoom and crosshair tooltips are built in); Vega-Lite for the escape hatch; add Lightweight Charts only if market panels need it | Two-way | One renderer adapter per panel type, plus shared theme tokens (`theme.json`) | After the first web slice. AG Charts Enterprise is the alternative if a single paid family is preferred |
 | Table renderers | Provisional | AG Grid Community for flat tables; TanStack Table for trees and grouping | Two-way | Table adapter, plus theme tokens | First web slice. AG Grid Enterprise would add tree data, at a cost |
 | Card storage | Decided | YAML files in git (`cards/*.yaml`) are the source of truth, loaded into a `cards` table as an index, like the ontology. Open-source contributors can bootstrap from git without database access. A customer-facing deployment can later make Postgres the source of truth | **One-way** for workflows and tooling | Every surface (CLI, MCP, web) reads and saves through one card repository interface in the engine, so going database-first changes only that interface's implementation | — |
-| Engine API | Open | A thin Python HTTP API that the web app calls; reverses the "web reads Postgres directly" decision | Two-way while the API surface is small | The API contract (e.g. an OpenAPI schema) | Before the web slice |
-| Web framework | Provisional | Next.js | Two-way while the web app only calls the engine API | The engine API | First web slice |
+| Engine API | Provisional | FastAPI inside the tempus package (`tempus serve`): concepts, cards, panel payloads, and a server-sent event stream for hot reload. Reverses the "web reads Postgres directly" decision | Two-way while the API surface is small | The OpenAPI schema FastAPI generates | When slice 1 is built |
+| Web framework | Provisional | No-build static app served by the engine (see register) | Two-way while the web app only calls the engine API | The engine API and the panel payload | When the UI outgrows plain modules |
 | Playground notebooks | Provisional | marimo | Two-way | Notebooks import the engine; no logic lives only in notebooks | When the playground slice starts |
 | Point-in-time data (vintages) | Open | — (e.g. FRED's ALFRED) | **One-way**: adds a time dimension to `observations`, and backfilling later is costly | — | Before any signal backtesting |
 | Prediction-market sources | Open | — (Kalshi, Polymarket) | Two-way | `Source` protocol; contract expiry may need metadata fields | When the widen slice starts |
+
+## Inspirations
+
+Proven projects and ideas we borrow from (principle 6), and those we evaluated. Each entry
+says what we take, what we leave, and where it shows up in tempus. Add an entry whenever a
+design leans on an outside pattern, so the reasoning stays traceable. The **status** column
+records whether we only borrow ideas, actually depend on the project, or are still
+evaluating it.
+
+| Source | License | Status | What we take | What we leave, and why | Where in tempus |
+|---|---|---|---|---|---|
+| [dbt Charts](https://docs.getdbt.com/guides/dbt-charts) | Apache-2.0 | Ideas; evaluated as a renderer | A typed YAML surface over a grammar (raw Vega-Lite rejected); a fixed chart registry where an unknown type fails validation; "did you mean" errors; channel names (`x`, `y`, `color`, `size`, `shape`); `rows`/`cols` layout for boards; the validate + serve-with-hot-reload loop | The tool itself: it's coupled to dbt (profiles, adapter), renders only through Vega-Lite (weak time-series interaction), and documents no custom chart types. Revisit if it gains a plugin API and non-dbt sources | Panel catalog, `tempus card check`, `tempus serve`, dashboards |
+| [Vega-Lite](https://vega.github.io/vega-lite/) | BSD-3 | Ideas, plus escape hatch | Encoding vocabulary (`x`, `y`, `color`, `mark`); grammar-of-graphics thinking | Full specs as the default: verbose, and the results look inconsistent | Panel grammar, `type: vega` |
+| Grafana | AGPL-3.0 | Ideas | Panel types as a closed set; named queries combined by expressions | The product: we're building a lab, not a monitoring stack | Panel catalog, card `inputs` and `formulas` |
+| Datadog query formulas | Proprietary (product) | Ideas | Formulas over named queries; the term `formulas`; `fill()`; frequency handling made explicit | — | Card `formulas`, function names |
+| PromQL / Prometheus | Apache-2.0 | Ideas | Functions apply to each member of a set (vector semantics); aggregation across a set; labels as dimensions | Range-vector syntax `[5m]` and label selectors (for now; they would trigger a real grammar such as Lark) | Concept sets in cards, the medium schema pattern |
+| pandas | BSD-3 | Ideas (names) | Function names: `resample`, `shift`, `pct_change`, `rolling`, `ewm`, `diff` | pandas as the engine (Polars is faster and stricter) | Function catalog |
+| statsmodels | BSD-3 | Ideas, plus a likely dependency | `ccf(…, nlags=)` naming; later, the forecasting methods (ETS, ARIMA, STL) | — | `lagcorr`, playground |
+| [Apache Ossie](https://github.com/apache/ossie/blob/main/core-spec/spec.md) | Apache-2.0 | Ideas (future) | The split between datasets, fields and metrics; `is_time` for time dimensions; vendor extensions for what the spec omits | Not needed until abstract metrics or warehouse sources exist | Future `{ metric: … }` references and the semantic source |
+| TimescaleDB schema guidance | Apache-2.0 docs | Ideas | Narrow, medium and wide table patterns | — | `observations`, the [Storage](#storage) section |
+| Amazon's one-way and two-way doors | — | Ideas | Decide fast on reversible choices; slow down on irreversible ones | — | Principle 8, Open decisions |
+| Cleveland & McGill (graphical perception) | — | Ideas | Position beats length, which beats angle and area; caution with dual axes | — | Panel catalog entries |
+| Jevbox | — | Ideas | Top-down filing, one choice per level, with a "none of these" option | — | Ontology filing |
 
 ## Storage
 
@@ -166,7 +189,7 @@ is a valid outcome, as long as it's justified fresh.
 2. **Check the triggers.** For each register row, has its revisit trigger fired?
    Walk **Open decisions**: settle anything whose "settle when" has arrived, and confirm
    no one-way door was passed without an explicit decision.
-3. **Scan the landscape** for each layer that has more than trivial impact: storage,
+3. **Scan the landscape** (and refresh **Inspirations**) for each layer that has more than trivial impact: storage,
    scheduler, filing, front end. Look for new or rising FOSS projects, license changes
    (relicensing is the main risk to principle 2), and project health (releases,
    maintainers, open issues).
