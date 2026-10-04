@@ -1,6 +1,6 @@
 # Cards, slice 1: language, engine and a minimal app
 
-- **Status:** Approved 2026-10-04 (PR #1)
+- **Status:** Implemented 2026-10-04
 - **Linear:** SPA-25 (card language v0). Resolves SPA-26 (where derived transforms live).
   Supersedes SPA-23 (Next.js scaffold).
 - **Horizon:** 2 · Cards (see `docs/SOUL.md`)
@@ -260,3 +260,17 @@ from a CDN; no npm.
 - `STACK.md`: register rows for Polars, FastAPI and uvicorn, and the web front end row.
   Graduate the settled entries out of Open decisions.
 - `README.md`: the `tempus card` commands, `tempus serve`, and the card format in brief.
+
+## Changes during implementation
+
+None change the card format, the payload, the API or the schema. Each departs from the plan
+(`2026-10-04-cards-slice-1-plan.md`), not from this design:
+
+- `pyproject.toml`: `docs/specs/*.md` excluded from `ruff format`. ruff 0.16 formats Python blocks inside Markdown, so `ruff format --check .` already failed on `main` because of the plan file.
+- Plan code was run through `ruff format`. Only the layout changed.
+- `tests/cards/test_check.py`: the generator variable `l` was renamed to `ln` to satisfy ruff E741.
+- `tests/test_sync.py`: the `pytest` and `tempus.db` imports were also removed. Only the moved `conn` fixture used them.
+- The Task 8 commit also adds `tests/cards/fixtures/lead.yaml`, which the plan's `git add` left out.
+- `web/app.js`: a concept in the tree opens when any descendant has a card. The plan checked only direct children, so "Prices" stayed collapsed and Task 11's manual check 1 couldn't pass.
+- `src/tempus/web/.gitkeep` was removed once Task 11 filled the directory.
+- Card and bad-card YAML files leave out the plan's leading `# path` comment. The bad cards start with their `# expect:` line.

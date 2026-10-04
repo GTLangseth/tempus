@@ -42,6 +42,22 @@ tempus ontology load               # validate + load ontology/concepts.yaml (syn
 To pin a series to a concept by hand, add `concept = "rates.mortgage"` to its `catalog.toml`
 entry. Pins override automatic filing.
 
+## Cards
+
+A card is a saved view: inputs (series), formulas that combine them, and panels that show
+the result. Cards are YAML files in `cards/`, checked in lint and rendered by `tempus serve`.
+
+```sh
+tempus card new my-card            # template in cards/my-card.yaml
+tempus card check                  # validate (add --offline to skip the DB)
+tempus card show crude-to-gasoline # summary; --json prints the panel payloads
+tempus card functions | panels     # the vocabulary
+tempus serve                       # http://127.0.0.1:8765, reloads when a card is saved
+```
+
+See `cards/crude-to-gasoline.yaml` for the format, and
+`docs/specs/2026-10-04-cards-slice-1-design.md` for the full design.
+
 ## mise tasks
 
 | task | does |
@@ -58,6 +74,7 @@ entry. Pins override automatic filing.
 - `series`: one row per `(source, series_id)` with metadata and `upstream_updated_at`
 - `observations`: hypertable on `ts`, `(source, series_id, ts) → value`
 - `sync_runs`: audit log of every sync attempt
+- `cards`: index of `cards/*.yaml`, rebuilt by `tempus card load`
 
 **How syncing works:** if the source's `last_updated` hasn't moved, the sync skips
 the download. Otherwise it downloads the full series and reconciles it in one
