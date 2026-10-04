@@ -4,7 +4,7 @@ Collect public time-series data (starting with [FRED](https://fred.stlouisfed.or
 TimescaleDB (Tiger Data), then explore it.
 
 ```
-catalog.toml ──▶ tempus sync ──▶ sources/ (fred, …) ──▶ TimescaleDB (docker) ──▶ web/ (soon)
+catalog.toml ──▶ tempus sync ──▶ sources/ (fred, …) ──▶ TimescaleDB (docker) ──▶ tempus serve (web)
 ```
 
 Blueprint, decisions, and roadmap: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
@@ -19,6 +19,25 @@ mise run setup        # .env, uv sync, start db, apply schema
 # put your free FRED key in .env → https://fred.stlouisfed.org/docs/api/api_key.html
 mise run sync
 ```
+
+## Explore
+
+Browse ~2,000 popular FRED series as a 3D tree and find them by describing them. No API
+keys needed to start:
+
+```sh
+uv run tempus db init
+uv run tempus catalog import-snapshot data/fred/series-snapshot.json   # metadata only
+uv run tempus ontology load        # tree + draft placements (ontology/placements.draft.yaml)
+uv run tempus serve                # http://127.0.0.1:8765
+```
+
+Drag to orbit, scroll to zoom, click a bead to fly to a concept and a seed to open its
+series page; press `/` and describe what you want ("mortgage rates", "jobs report"). The
+search walks the tree with Jev when `TYPESAFE_API_KEY` is set, and with a labeled lexical
+fallback when it isn't. Snapshot series have no data until synced: with `FRED_API_KEY` set a
+series page syncs on first open; otherwise run `tempus catalog add fred <ID> --sync`. The
+draft placements were written by Claude; `tempus ontology file` lets Jev decide them.
 
 ## CLI
 
@@ -35,8 +54,10 @@ tempus series show UNRATE          # sparkline + recent points
 tempus runs                        # sync history
 
 tempus ontology tree               # concept tree with the series filed in it
-tempus ontology file               # file unplaced series with Jev (needs TYPESAFE_API_KEY)
-tempus ontology load               # validate + load ontology/concepts.yaml (sync does this too)
+tempus ontology file               # file unplaced and draft-placed series with Jev (needs TYPESAFE_API_KEY)
+tempus ontology load               # validate + load concepts.yaml and draft placements (sync does this too)
+tempus catalog import-snapshot data/fred/series-snapshot.json  # browse without syncing
+tempus resolve "crude oil price"   # phrase → concepts → series, with probabilities
 ```
 
 To pin a series to a concept by hand, add `concept = "rates.mortgage"` to its `catalog.toml`
@@ -74,6 +95,7 @@ See `cards/crude-to-gasoline.yaml` for the format, and
 - `series`: one row per `(source, series_id)` with metadata and `upstream_updated_at`
 - `observations`: hypertable on `ts`, `(source, series_id, ts) → value`
 - `sync_runs`: audit log of every sync attempt
+- `concepts` / `series_concepts`: the tree and one placement per series (manual > auto > draft)
 - `cards`: index of `cards/*.yaml`, rebuilt by `tempus card load`
 
 **How syncing works:** if the source's `last_updated` hasn't moved, the sync skips
