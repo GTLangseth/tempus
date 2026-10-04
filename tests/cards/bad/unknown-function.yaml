@@ -1,0 +1,7 @@
+# expect: formulas.g | unknown function 'yoyy'
+version: 1
+title: t
+question: q
+inputs: {gasoline: "fred:CUSR0000SETB01"}
+formulas: {g: yoyy(gasoline)}
+panels: [{type: timeseries, y: [g]}]

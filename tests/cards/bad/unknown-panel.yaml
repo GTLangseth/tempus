@@ -1,0 +1,6 @@
+# expect: panels[0] | unknown panel type 'timeseris'
+version: 1
+title: t
+question: q
+inputs: {x: "fred:X"}
+panels: [{type: timeseris, y: [x]}]

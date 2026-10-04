@@ -1,0 +1,7 @@
+# expect: panels[0] | needs a lagcorr table
+version: 1
+title: t
+question: q
+inputs: {x: "fred:X"}
+formulas: {x_yoy: yoy(x)}
+panels: [{type: lagcorr, data: x_yoy}]

@@ -35,7 +35,9 @@ and the quarterly review procedure live in [`STACK.md`](STACK.md).
 | CLI | ✅ built | `src/tempus/cli.py` | `tempus` commands for data actions: sync, catalog, inspect, search |
 | Repo tooling | ✅ built | `mise.toml` | Pins tools (Python, uv, Node) and runs repo tasks (setup, db, test, lint) |
 | Scheduler | 🟡 minimal | `tempus sync --every 6h` | A blocking loop for now; see open questions |
-| Web front end | ⬜ planned | `web/` | Next.js app for exploring and visualizing series |
+| Cards | ✅ built | `cards/`, `src/tempus/cards/` | Card language v1 (inputs, formulas, panels), static checks, Polars engine, panel payloads |
+| App | ✅ built | `src/tempus/app.py`, `src/tempus/web/` | `tempus serve`: FastAPI engine API + no-build static front end (ECharts), hot reload |
+| Web front end | 🟡 cards view built; explore view is SPA-23 | see App | The App row above serves it; no separate Next.js app |
 
 ## Data flow
 
@@ -49,7 +51,7 @@ catalog.toml ──▶ tempus sync ──▶ Source adapter ──HTTP──▶ 
 ontology/concepts.yaml ──▶ tempus ontology file ──▶ Jev (TypeSafe API)
                      │
                      ▼
-     web/ (Next.js, planned) ── reads directly with SQL
+cards/*.yaml ──▶ card engine (check · resolve · evaluate · render) ──▶ panel payloads ──▶ tempus serve ──▶ browser
 ```
 
 ## Data model
@@ -63,6 +65,9 @@ ontology/concepts.yaml ──▶ tempus ontology file ──▶ Jev (TypeSafe AP
 - **`series_concepts`** holds one placement per series: `manual` (a pin) or `auto` (with the
   lowest probability along the path, plus a trail of each level's decision). A NULL concept
   means nothing fit at the top level.
+- **`cards`** is an index of `cards/*.yaml` (the files are the source of truth): id, title,
+  question, tags, concepts, the parsed spec as `jsonb`, and a file hash. Rebuilt by
+  `tempus card load`.
 
 Each series is identified by the pair `(source, series_id)`, so the same ID can exist at
 two different providers without colliding.
@@ -139,6 +144,15 @@ By the horizon in [`SOUL.md`](SOUL.md) where it first matters. Status: ✅ built
 
 Newest first. Each entry: what we chose, and why.
 
+- **2026-10-04 · Cards are evaluated in a Python engine; the web app reads through it.**
+  This reverses "the web app reads TimescaleDB directly": cards are the shared logic that
+  decision said would trigger a revisit. `tempus serve` (FastAPI) returns renderer-neutral
+  panel payloads; the browser never touches formulas or SQL. Spec:
+  `docs/specs/2026-10-04-cards-slice-1-design.md`.
+- **2026-10-04 · Derived data lives in card formulas** (resolves the open question).
+  Transforms (YoY, resampling, rolling, lag correlation) are catalog functions evaluated
+  with Polars. Functions may later push down to SQL without changing the language.
+
 - **2026-10-04 · Jev decides, Claude generates, code computes.** In agentic workflows, Jev
   handles every choice from a closed set: filing, resolving phrases to series IDs, choosing
   card operations, series labels, card checks and market mapping. Claude generates only
@@ -184,7 +198,8 @@ Newest first. Each entry: what we chose, and why.
 - **2026-10-04 · Hand-written architecture doc; no generated wiki yet.** Intent and rationale
   can't be derived from code. Revisit a generated wiki (e.g. OpenWiki) once the codebase is
   large enough to warrant one.
-- **2026-10-03 · The web app reads TimescaleDB directly (planned).** Next.js server code
+- **2026-10-03 · The web app reads TimescaleDB directly (planned; reversed 2026-10-04, see
+  above).** Next.js server code
   queries Postgres, with no Python API in between. That means one less service while the
   Python side does nothing beyond ingestion. Revisit if we need shared business logic
   (e.g. derived series computed in Python).
@@ -227,8 +242,5 @@ Newest first. Each entry: what we chose, and why.
   with dependencies between them.
 - **Next data sources:** BLS, BEA, Treasury, World Bank, or scraped sites? Scraped sites
   may not fit the `Source` protocol's "metadata plus full series" shape.
-- **Derived data:** where do transforms live (YoY change, rolling averages, resampling)?
-  The options are SQL views or continuous aggregates in TimescaleDB, Python at sync time,
-  or the front end.
 - **Revision history:** we currently keep only the latest values. Do we want vintages
   (what the data said on date X), e.g. via FRED's ALFRED vintage data?

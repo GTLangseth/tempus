@@ -1,0 +1,7 @@
+# expect: formulas.gas_yoy | unknown name 'gasolin'
+version: 1
+title: t
+question: q
+inputs: {gasoline: "fred:CUSR0000SETB01"}
+formulas: {gas_yoy: yoy(gasolin)}
+panels: [{type: timeseries, y: [gas_yoy]}]

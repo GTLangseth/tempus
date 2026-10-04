@@ -1,0 +1,7 @@
+# expect: formulas.a | attribute access
+version: 1
+title: t
+question: q
+inputs: {x: "fred:X"}
+formulas: {a: x.values}
+panels: [{type: timeseries, y: [a]}]

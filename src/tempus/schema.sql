@@ -64,3 +64,15 @@ CREATE TABLE IF NOT EXISTS series_concepts (
     PRIMARY KEY (source, series_id),
     FOREIGN KEY (source, series_id) REFERENCES series ON DELETE CASCADE
 );
+
+-- Index of cards/*.yaml (the files are the source of truth), rebuilt by `tempus card load`.
+CREATE TABLE IF NOT EXISTS cards (
+    id         text        PRIMARY KEY,                  -- the file name, kebab-case
+    title      text        NOT NULL,
+    question   text        NOT NULL,
+    tags       text[]      NOT NULL DEFAULT '{}',
+    concepts   text[]      NOT NULL DEFAULT '{}',
+    spec       jsonb       NOT NULL,
+    file_hash  text        NOT NULL,
+    loaded_at  timestamptz NOT NULL DEFAULT now()
+);

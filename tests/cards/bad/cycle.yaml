@@ -1,0 +1,7 @@
+# expect: formulas | cycle
+version: 1
+title: t
+question: q
+inputs: {x: "fred:X"}
+formulas: {a: "b + x", b: "a + x"}
+panels: [{type: timeseries, y: [a]}]
