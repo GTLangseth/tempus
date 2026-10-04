@@ -61,6 +61,7 @@ License key: **OSI** = open source · **SA** = source-available · **P** = propr
 | CLI | typer + rich | OSI | Type-hinted commands; good terminal output | click, argparse | — |
 | HTTP | httpx | OSI | Sync and async, modern API | requests, aiohttp | — |
 | DB driver | psycopg 3 | OSI (LGPL-3.0) | COPY for bulk loads; the reference Postgres driver | asyncpg | — |
+| Card engine dataframes | Polars | OSI (MIT) | Fast, strict types; its expression API matches the formula style. Card functions are small Polars functions | pandas | A function needs a library that only speaks pandas (convert at that function's boundary first) |
 | Config | pydantic-settings | OSI | Typed settings from `.env` | python-dotenv | — |
 | Catalog format | TOML via tomlkit | OSI | Reviewable in git; tomlkit keeps comments when editing | YAML | — |
 | Decision model (filing, resolving phrases to series IDs, series labels, card checks) | TypeSafe Jev (hosted API), pinned model version | P | Returns calibrated probabilities for decisions from a closed set, which the thresholds need; cheap. Usage rules: `ARCHITECTURE.md` → Using Jev | Local open-weight LLM with logprobs (e.g. via llama.cpp or vLLM), embedding similarity | An open model gives comparably calibrated choices; cost or availability becomes an issue |
