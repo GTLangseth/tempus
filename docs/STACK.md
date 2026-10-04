@@ -90,6 +90,7 @@ Status key: **Open** = undecided · **Provisional** = default in use, easy to ch
 | Playground notebooks | Provisional | marimo | Two-way | Notebooks import the engine; no logic lives only in notebooks | When the playground slice starts |
 | Point-in-time data (vintages) | Open | — (e.g. FRED's ALFRED) | **One-way**: adds a time dimension to `observations`, and backfilling later is costly | — | Before any signal backtesting |
 | Prediction-market sources | Open | — (Kalshi, Polymarket) | Two-way | `Source` protocol; contract expiry may need metadata fields | When the widen slice starts |
+| Code-intelligence MCP for agents | Open | Not adopted. Candidate: [codebase-memory-mcp](https://github.com/DeusData/codebase-memory-mcp) (OSI, MIT; local tree-sitter code graph in SQLite with call graphs, cross-service links and change impact; single binary, no network). At ~1.5k lines of Python today, `grep` plus the docs cover navigation; the extra tool descriptions in every session aren't worth it yet. If adopted, don't use its `manage_adr` tool: decisions stay in `ARCHITECTURE.md` | Two-way: config only, and no code depends on it | MCP config in `.claude/` only; never commit its graph snapshot | After the first web slice (engine API + static app) lands and the code passes ~10k lines across Python, JS and SQL; or when tracing usages across layers (e.g. "what reads `series_concepts`?") or gauging how far a refactor reaches becomes a recurring cost |
 
 ## Inspirations
 
