@@ -188,7 +188,9 @@ def _rank_series(query: str, catalog: Catalog, chooser: Chooser, paths: list[Pat
             for ref in menu
             if probs.get(ref, 0.0) > 0.001
         ]
-        ranked.sort(key=lambda s: (-round(s["p"], 2), -(s.get("popularity") or 0)))
+        # Probabilities within ~0.1 of each other are a tie (Jev drifts by about ±0.03 between
+        # identical calls), and among ties the more popular series comes first.
+        ranked.sort(key=lambda s: (-round(s["p"] * 10), -(s.get("popularity") or 0)))
         out += ranked
         seen |= set(candidates)
     return out[:SERIES_RESULTS]
@@ -204,7 +206,7 @@ STOP = {
 }  # fmt: skip
 # A few everyday words for the ones the tree uses. A hint for the fallback, not a thesaurus.
 SYNONYMS = {
-    "job": ["employment", "payrolls"],
+    "job": ["employment", "payrolls", "nonfarm"],
     "inflation": ["cpi", "prices"],
     "oil": ["crude"],
     "stock": ["equities"],
