@@ -1,0 +1,7 @@
+# expect: formulas.m | must be one of
+version: 1
+title: t
+question: q
+inputs: {x: "fred:X"}
+formulas: {m: 'resample(x, "monthly")'}
+panels: [{type: timeseries, y: [m]}]
