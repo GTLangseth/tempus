@@ -57,13 +57,19 @@ CREATE TABLE IF NOT EXISTS series_concepts (
     source     text        NOT NULL,
     series_id  text        NOT NULL,
     concept_id text        REFERENCES concepts ON DELETE CASCADE,  -- NULL = filed, but no fit at the top level
-    method     text        NOT NULL CHECK (method IN ('manual', 'auto')),
+    method     text        NOT NULL,                       -- manual (pin) > auto (Jev) > draft
     confidence real,                                       -- lowest probability along the auto path
     trail      jsonb       NOT NULL DEFAULT '[]'::jsonb,   -- each level's decision, for review
     filed_at   timestamptz NOT NULL DEFAULT now(),
     PRIMARY KEY (source, series_id),
     FOREIGN KEY (source, series_id) REFERENCES series ON DELETE CASCADE
 );
+
+-- Migration 2026-10-04: allow 'draft' placements (ontology/placements.draft.yaml). Dropping
+-- and re-adding the named constraint keeps this idempotent on databases created before it.
+ALTER TABLE series_concepts DROP CONSTRAINT IF EXISTS series_concepts_method_check;
+ALTER TABLE series_concepts ADD CONSTRAINT series_concepts_method_check
+    CHECK (method IN ('manual', 'auto', 'draft'));
 
 -- Index of cards/*.yaml (the files are the source of truth), rebuilt by `tempus card load`.
 CREATE TABLE IF NOT EXISTS cards (

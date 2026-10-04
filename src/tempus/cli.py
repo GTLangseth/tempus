@@ -71,6 +71,10 @@ def _sparkline(values: list[float]) -> str:
     return "".join(SPARK[int((v - lo) / span * (len(SPARK) - 1))] for v in values)
 
 
+def _fmt_p(p: float | None) -> str:
+    return "—" if p is None else f"{p:.2f}"
+
+
 def _parse_interval(text: str) -> int:
     match = re.fullmatch(r"(\d+)([smhd])", text)
     if not match:
@@ -358,18 +362,35 @@ def _load_ontology(conn, settings, *, quiet: bool = False) -> list[ontology.Conc
     if bad:
         console.print(f"[red]catalog.toml pins to unknown concepts:[/red] {', '.join(sorted(bad))}")
         raise typer.Exit(1)
+    try:
+        drafts = ontology.load_drafts(settings.drafts_path)
+    except (ontology.OntologyError, OSError) as exc:
+        console.print(f"[red]{exc}[/red]")
+        raise typer.Exit(1) from exc
+    stale = sorted({d.concept for d in drafts.values() if d.concept not in known})
     upserted, removed = ontology.sync_to_db(conn, roots)
     pinned = ontology.apply_pins(conn, pins)
+    drafted = ontology.apply_drafts(conn, drafts)
     if not quiet:
         console.print(
-            f"[green]{upserted} concepts loaded[/green] ({removed} removed), {pinned} pins"
+            f"[green]{upserted} concepts loaded[/green] ({removed} removed), {pinned} pins, "
+            f"{drafted} draft placements"
         )
+        if stale:
+            console.print(
+                f"[yellow]{settings.drafts_path} names unknown concepts (skipped):[/yellow] "
+                + ", ".join(stale)
+            )
     return roots
 
 
 @ontology_app.command("load")
 def ontology_load():
-    """Validate ontology/concepts.yaml and catalog pins, and load them into the database."""
+    """Validate ontology/concepts.yaml, catalog pins and draft placements, and load them.
+
+    Draft placements (ontology/placements.draft.yaml) fill in series that have no pin and
+    no Jev decision yet; `tempus ontology file` replaces them with real filing.
+    """
     with _connect() as conn:
         _load_ontology(conn, get_settings())
 
@@ -378,7 +399,7 @@ def ontology_load():
 def ontology_file(
     refile: bool = typer.Option(False, help="Re-decide existing auto placements too"),
 ):
-    """Place unfiled series in the tree with Jev. Manual pins are never changed."""
+    """Place unfiled and draft-placed series in the tree with Jev. Pins are never changed."""
     settings = get_settings()
     try:
         jev = JevClient(settings.typesafe_api_key)
@@ -439,7 +460,7 @@ def ontology_tree(
         )
 
     def label(r) -> str:
-        how = "📌" if r["method"] == "manual" else f"{r['confidence']:.2f}"
+        how = {"manual": "📌", "draft": "draft"}.get(r["method"]) or _fmt_p(r["confidence"])
         return f"[cyan]{r['series_id']}[/cyan] [dim]{(r['title'] or '')[:60]} · {how}[/dim]"
 
     def add(node: Tree, parent_id: str | None) -> None:

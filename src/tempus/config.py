@@ -11,6 +11,7 @@ class Settings(BaseSettings):
     typesafe_api_key: str | None = None
     catalog_path: Path = Path("catalog.toml")
     ontology_path: Path = Path("ontology/concepts.yaml")
+    drafts_path: Path = Path("ontology/placements.draft.yaml")
     cards_path: Path = Path("cards")
 
 
