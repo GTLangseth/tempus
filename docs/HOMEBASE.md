@@ -46,11 +46,15 @@ mise run homebase:setup                 # add `-- --with-sync` to also sync ever
 
 It's safe to re-run. It asks for your password once, then:
 
-- installs Tailscale, Colima, Docker CLI + compose, tmux and gh
+- installs Tailscale, Colima, Docker CLI + compose, tmux and gh. If Tailscale.app is already
+  installed, or a Docker engine (e.g. Docker Desktop) is already running, it uses those instead
+  of adding a second copy
 - stops the Mac from sleeping and restarts it after a power failure (`pmset`)
 - turns on Remote Login, or tells you to do it in System Settings if Terminal lacks Full Disk Access
 - installs `tailscaled` as a system daemon and joins your tailnet (open the login link it prints)
-- starts Colima at login, starts TimescaleDB and runs `tempus db init`
+- starts Colima at login, starts TimescaleDB and runs `tempus db init`. If another Postgres
+  already holds port 5432, it stops and asks you to set `TEMPUS_DB_PORT` and `DATABASE_URL` in
+  `.env` to a free port (e.g. 5433)
 - keeps `tempus serve` running with launchd on 127.0.0.1:8765, logging to `~/Library/Logs/tempus/`
 - publishes it to your tailnet with `tailscale serve`
 - ends with a list of anything left to do by hand
@@ -107,7 +111,7 @@ same two commands. Use cloud routines instead for code-only work that doesn't ne
 ## Use the mini's database from the MacBook
 
 ```sh
-ssh -N -L 5433:127.0.0.1:5432 <you>@<mini>      # leave running
+ssh -N -L 5433:127.0.0.1:5432 <you>@<mini>      # leave running; use the mini's TEMPUS_DB_PORT on the right
 DATABASE_URL=postgres://postgres:password@localhost:5433/tempus uv run tempus series list
 ```
 
@@ -139,4 +143,4 @@ Pick one consciously. For a box that lives at home, either is reasonable.
 - `tailscale serve` fails: HTTPS certificates aren't enabled (step 2).
 - The app doesn't load over the tailnet but `curl 127.0.0.1:8765` works: run `tailscale serve status`, then `sudo tailscale serve --bg 8765`.
 - `docker compose` not found: re-run setup. It registers Homebrew's compose plugin in `~/.docker/config.json`.
-- Database down after a reboot: `colima start && mise run db:up`.
+- Database down after a reboot: `colima start && mise run db:up` (with Docker Desktop: open it, then `mise run db:up`).

@@ -157,6 +157,13 @@ By the horizon in [`SOUL.md`](SOUL.md) where it first matters. Status: ✅ built
 
 Newest first. Each entry: what we chose, and why.
 
+- **2026-10-04 · Home base setup reuses Tailscale.app and a running Docker engine.** The
+  actual mini already ran Tailscale.app and Docker Desktop (with another project's Postgres
+  on 5432). Running a second Tailscale or a second container VM next to them would conflict,
+  so `homebase:setup` now detects both and skips `tailscaled`/Colima. tempus's DB moves with
+  `TEMPUS_DB_PORT` in `.env` (5433 there), and setup stops if the port is taken. With
+  FileVault on, the daemon's "up before login" advantage doesn't apply anyway. A fresh Mac
+  still gets the daemon and Colima as before.
 - **2026-10-04 · A Mac mini is the home base, reached over Tailscale.** The real database,
   API keys and long-running agents live on one always-on machine at home. Everything binds
   to localhost (the app, and now Postgres in `docker-compose.yml`). Tailscale publishes the
