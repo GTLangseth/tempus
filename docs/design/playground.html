@@ -1,0 +1,379 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Neon Notebook playground</title>
+<!-- Fonts are optional: every stack falls back to system fonts if this fails to load. -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo+Black&family=Bricolage+Grotesque:opsz,wght@12..96,700;12..96,800&family=DM+Mono:wght@500&family=DM+Sans:wght@400;500&family=Fraunces:opsz,wght@9..144,800&family=IBM+Plex+Mono:wght@500;700&family=IBM+Plex+Sans:wght@400;500&family=Inter:wght@400;500&family=JetBrains+Mono:wght@500;700&family=Rubik:wght@800&family=Space+Grotesk:wght@700&family=Space+Mono:wght@400;700&family=Syne:wght@800&family=VT323&family=Work+Sans:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root { color-scheme: dark; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; }
+  body { background: #121212; color: #e6e6e6; font: 13px/1.45 system-ui, -apple-system, sans-serif;
+         display: grid; grid-template-columns: 340px 1fr; }
+  /* ---------- controls ---------- */
+  aside { border-right: 1px solid #262626; overflow-y: auto; padding: 16px 16px 40px; background: #161616; }
+  aside h1 { font-size: 15px; margin: 0 0 4px; }
+  aside .sub { color: #8a8a8a; margin: 0 0 14px; }
+  fieldset { border: 0; border-top: 1px solid #262626; margin: 0; padding: 12px 0 6px; }
+  legend { font: 600 11px ui-monospace, monospace; letter-spacing: .08em; text-transform: uppercase; color: #9a9a9a; padding: 0; }
+  .row { display: grid; grid-template-columns: 104px 1fr; align-items: center; gap: 8px; margin: 8px 0; }
+  .row label { color: #bdbdbd; }
+  select, input[type=range] { width: 100%; }
+  select { background: #1f1f1f; color: #e6e6e6; border: 1px solid #333; border-radius: 6px; padding: 5px 6px; font: inherit; }
+  .val { font: 11px ui-monospace, monospace; color: #8a8a8a; margin-left: 6px; }
+  .opts { display: flex; flex-wrap: wrap; gap: 6px; }
+  .opt { background: #1f1f1f; border: 1px solid #333; color: #d6d6d6; border-radius: 6px; padding: 5px 8px; cursor: pointer; font: inherit; }
+  .opt:hover { border-color: #555; }
+  .opt[aria-pressed=true] { border-color: #f0057f; color: #fff; background: #2a1420; }
+  .presets { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-bottom: 8px; }
+  .presets .opt { text-align: left; }
+  .presets .opt small { display: block; color: #8a8a8a; font-size: 11px; }
+  .swatch-opt { display: inline-flex; gap: 2px; vertical-align: middle; margin-right: 6px; }
+  .swatch-opt i { width: 10px; height: 10px; border-radius: 2px; display: inline-block; }
+  /* ---------- right side ---------- */
+  .right { display: grid; grid-template-rows: 1fr auto; min-height: 0; }
+  #stage { overflow: auto; min-height: 0; transition: background-color .2s; }
+  .prompt-box { border-top: 1px solid #262626; background: #161616; padding: 12px 16px; display: grid; grid-template-columns: 1fr auto; gap: 12px; align-items: start; }
+  #prompt { font: 12px/1.5 ui-monospace, monospace; color: #d6d6d6; white-space: pre-wrap; max-height: 150px; overflow: auto; margin: 0; }
+  #copy { background: #f0057f; color: #fff; border: 0; border-radius: 6px; padding: 8px 14px; font: 600 13px system-ui; cursor: pointer; min-width: 110px; }
+  /* ---------- preview (driven by CSS variables set from state) ---------- */
+  .pv { color: var(--ink); font-family: var(--body); font-size: 16px; line-height: 1.55; padding: 48px 16px 64px; min-height: 100%; }
+  .pv main { max-width: var(--width); margin: 0 auto; display: grid; gap: 32px; }
+  .pv .feed { display: grid; grid-template-columns: repeat(var(--cols), minmax(0, 1fr)); gap: 32px; align-items: start; }
+  .pv .label { font: 500 11px/1.4 var(--mono); letter-spacing: .06em; text-transform: uppercase; color: var(--pencil); font-feature-settings: "calt" 0, "liga" 0; }
+  .pv .mono-pixel .label { font-size: 15px; letter-spacing: .04em; }
+  .pv header h1 { font-family: var(--display); font-weight: var(--display-w); font-size: clamp(44px, 7vw, 72px); line-height: .95; letter-spacing: var(--display-track); margin: 8px 0 14px; }
+  .pv header p { color: var(--graphite); max-width: 54ch; margin: 0; }
+  .pv .card { position: relative; background: var(--paper); border: 1px solid var(--hairline); border-radius: var(--radius); padding: 24px; display: grid; gap: 16px; }
+  .pv .card h2 { font-family: var(--display); font-weight: var(--display-w); font-size: 32px; line-height: 1.06; letter-spacing: var(--display-track); margin: 0; }
+  .pv .stats { display: flex; gap: 28px; flex-wrap: wrap; align-items: flex-end; }
+  .pv .stat b { display: inline-block; font: 700 40px/1 var(--mono); letter-spacing: -.02em; margin-bottom: 6px; }
+  .pv .stat .label { display: block; }
+  .pv .notes { font-size: 14px; color: var(--graphite); margin: 0; }
+  .pv .foot { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+  .pv .chip { font: 500 11px/1 var(--mono); letter-spacing: .06em; text-transform: uppercase; border: 1px solid var(--hairline); border-radius: 9999px; padding: 5px 10px; background: var(--paper); color: var(--ink); }
+  .pv .btn { font: 500 14px var(--body); background: var(--ink); color: var(--paper); border: 0; border-radius: 4px; padding: 10px 18px; margin-left: auto; cursor: pointer; }
+  .pv .btn:hover { background: var(--s4); color: #fff; }
+  .pv svg { width: 100%; height: auto; display: block; overflow: visible; }
+  .pv svg text { font: 500 10px var(--mono); fill: var(--pencil); letter-spacing: .04em; }
+  .pv .tape { position: absolute; top: -11px; left: 50%; width: 92px; height: 22px; transform: translateX(-50%) rotate(-2.5deg);
+              background: color-mix(in srgb, var(--mark) 55%, transparent); border-left: 1px dashed rgba(0,0,0,.08); border-right: 1px dashed rgba(0,0,0,.08); }
+  .pv .palette { display: grid; grid-template-columns: repeat(auto-fill, minmax(104px, 1fr)); gap: 8px; }
+  .pv .sw { border: 1px solid var(--hairline); border-radius: 8px; overflow: hidden; background: var(--paper); }
+  .pv .sw i { display: block; height: 40px; }
+  .pv .sw span { display: block; padding: 6px 8px; }
+  .pv .sw .ok { color: var(--ink); } .pv .sw .bad { text-decoration: line-through; }
+  @media (max-width: 860px) { body { grid-template-columns: 1fr; } aside { border-right: 0; border-bottom: 1px solid #262626; max-height: 45vh; } }
+</style>
+</head>
+<body>
+<aside>
+  <h1>Neon Notebook playground</h1>
+  <p class="sub">Tune the choices in <code>docs/DESIGN.md</code>, then copy the prompt at the bottom.</p>
+
+  <fieldset><legend>Presets</legend><div class="presets" id="presets"></div></fieldset>
+
+  <fieldset><legend>Page</legend>
+    <div class="row"><label>Paper</label><select id="canvas"></select></div>
+    <div class="row"><label>Ruling</label><div class="opts" data-key="ruling"></div></div>
+    <div class="row"><label>Ruling strength</label><div><input type="range" id="rulingStrength" min="0" max="100" step="5"></div></div>
+    <div class="row"><label>Cell size</label><div class="opts" data-key="cell"></div></div>
+  </fieldset>
+
+  <fieldset><legend>Neon</legend>
+    <div class="row"><label>Neon set</label><select id="neon"></select></div>
+    <div class="row"><label>Primary</label><div class="opts" data-key="primary"></div></div>
+    <div class="row"><label>Treatment</label><div class="opts" data-key="treatment"></div></div>
+    <div class="row"><label>Stat style</label><div class="opts" data-key="statStyle"></div></div>
+    <div class="row"><label>Line weight</label><div><input type="range" id="lineWidth" min="1.5" max="4" step="0.5"></div></div>
+  </fieldset>
+
+  <fieldset><legend>Type</legend>
+    <div class="row"><label>Display</label><select id="display"></select></div>
+    <div class="row"><label>Mono / labels</label><select id="mono"></select></div>
+    <div class="row"><label>Body</label><select id="body"></select></div>
+  </fieldset>
+
+  <fieldset><legend>Highlighter</legend>
+    <div class="row"><label>Style</label><div class="opts" data-key="markStyle"></div></div>
+    <div class="row"><label>Color</label><div class="opts" data-key="markColor"></div></div>
+  </fieldset>
+
+  <fieldset><legend>Cards & layout</legend>
+    <div class="row"><label>Elevation</label><div class="opts" data-key="elevation"></div></div>
+    <div class="row"><label>Corner radius</label><div><input type="range" id="radius" min="0" max="24" step="2"></div></div>
+    <div class="row"><label>Feed width</label><div><input type="range" id="width" min="560" max="1200" step="40"></div></div>
+    <div class="row"><label>Columns</label><div class="opts" data-key="cols"></div></div>
+  </fieldset>
+</aside>
+
+<div class="right">
+  <div id="stage"><div class="pv" id="pv"></div></div>
+  <div class="prompt-box"><pre id="prompt"></pre><button id="copy">Copy prompt</button></div>
+</div>
+
+<script>
+// ---------- option catalogs ----------
+const CANVASES = {
+  cream:     { name: 'Cream notebook', canvas: '#f2efe6', paper: '#fbf9f3', grid: '#e2ddcf', hairline: '#d4cfbf', ink: '#1c1b19', graphite: '#4a4843', pencil: '#6b675e' },
+  manila:    { name: 'Manila folder',  canvas: '#e9dfc7', paper: '#f6f0e1', grid: '#d7cbb0', hairline: '#cbbd9c', ink: '#22201b', graphite: '#4d473c', pencil: '#665e4d' },
+  newsprint: { name: 'Newsprint grey', canvas: '#e7e6e1', paper: '#f7f7f4', grid: '#d6d5ce', hairline: '#c9c8c0', ink: '#1a1a19', graphite: '#474744', pencil: '#63625c' },
+  legal:     { name: 'Legal pad',      canvas: '#f6efc6', paper: '#fdf8df', grid: '#bcd3e0', hairline: '#d8cf9f', ink: '#1d1c18', graphite: '#4b4836', pencil: '#625d48' },
+  chalk:     { name: 'Chalkboard (dark)', canvas: '#1d1f1c', paper: '#262824', grid: '#30332e', hairline: '#3f423b', ink: '#f1eee4', graphite: '#c4c0b4', pencil: '#a29e92' },
+};
+const NEONS = {
+  highlighter: { name: 'Highlighter', s: ['#f0057f', '#0091d4', '#f04a00', '#6a2cff', '#00a050'], marks: { lime: '#c6ff1a', yellow: '#ffe600', pink: '#ffc2e0' } },
+  arcade:      { name: 'Arcade (current)',       s: ['#ff1f8f', '#00a3e8', '#ff5a1f', '#8b3dff', '#00b860'], marks: { lime: '#b6ff00', yellow: '#fff200', pink: '#ffb3dc' } },
+  riso:        { name: 'Risograph inks',        s: ['#ff48b0', '#0078bf', '#ff6c2f', '#765ba7', '#00a95c'], marks: { lime: '#d2f53c', yellow: '#ffe800', pink: '#ffc4e4' } },
+  synthwave:   { name: 'Synthwave',             s: ['#e4007c', '#008fb3', '#ff7a00', '#9b00e8', '#00a88a'], marks: { lime: '#ccff00', yellow: '#ffd600', pink: '#ffc0f0' } },
+  deep:        { name: 'Deep neon (max contrast)', s: ['#c8006a', '#0072b0', '#c73e00', '#5a1fe0', '#008043'], marks: { lime: '#d4ff4d', yellow: '#ffeb3b', pink: '#ffd0e6' } },
+};
+const NEON_NAMES = ['pink', 'cyan', 'orange', 'violet', 'green'];
+const DISPLAY = {
+  'Bricolage Grotesque': { w: 800, track: '-0.03em', note: 'chunky, slightly retro grotesque' },
+  'Space Grotesk':       { w: 700, track: '-0.03em', note: 'techy grotesque with quirky details' },
+  'Syne':                { w: 800, track: '-0.02em', note: 'wide, art-school display' },
+  'Fraunces':            { w: 800, track: '-0.02em', note: 'soft, old-style retro serif' },
+  'Archivo Black':       { w: 400, track: '-0.02em', note: 'heavy poster grotesque' },
+  'Rubik':               { w: 800, track: '-0.02em', note: 'rounded, friendly, arcade-ish' },
+};
+const MONO = {
+  'JetBrains Mono': 'clean developer mono', 'IBM Plex Mono': 'technical, typewriter-adjacent',
+  'Space Mono': 'retro geometric mono', 'DM Mono': 'soft, low-contrast mono', 'VT323': 'pixel terminal font',
+};
+const BODY = { 'Inter': 'neutral workhorse', 'IBM Plex Sans': 'technical, slightly warm', 'DM Sans': 'soft geometric', 'Work Sans': 'friendly grotesque' };
+
+const CHOICES = {
+  ruling:    { grid: 'Graph grid', dots: 'Dot grid', lined: 'Lined + margin', none: 'None' },
+  cell:      { 16: '16px', 24: '24px', 32: '32px' },
+  primary:   { 0: 'pink', 1: 'cyan', 2: 'orange', 3: 'violet', 4: 'green' },
+  treatment: { flat: 'Flat', drop: 'Ink drop', misreg: 'Riso offset', glow: 'Glow' },
+  statStyle: { text: 'Neon text', chip: 'Ink chip', outline: 'Outlined' },
+  markStyle: { block: 'Block', half: 'Lower half', underline: 'Underline', none: 'None' },
+  markColor: { lime: 'Lime', yellow: 'Yellow', pink: 'Pink tint' },
+  elevation: { flat: 'Flat', pinned: 'Sticker (pinned)', sticker: 'Sticker (all)', tape: 'Taped' },
+  cols:      { 1: 'One', 2: 'Two' },
+};
+
+const DEFAULTS = {
+  canvas: 'cream', ruling: 'grid', rulingStrength: 100, cell: '24',
+  neon: 'arcade', primary: '0', treatment: 'flat', statStyle: 'text', lineWidth: 2,
+  display: 'Space Grotesk', mono: 'JetBrains Mono', body: 'Inter',
+  markStyle: 'half', markColor: 'lime', elevation: 'sticker', radius: 8, width: 960, cols: '1',
+};
+const PRESETS = {
+  'Neon Notebook': { note: 'current DESIGN.md', v: {} },
+  'Riso Zine':     { note: 'manila, ink offset, taped', v: { canvas: 'manila', ruling: 'dots', neon: 'riso', treatment: 'misreg', display: 'Space Grotesk', mono: 'Space Mono', markStyle: 'half', markColor: 'yellow', elevation: 'tape', radius: 4 } },
+  'Arcade Ledger': { note: 'dark board, pixel labels', v: { canvas: 'chalk', ruling: 'grid', rulingStrength: 70, cell: '16', neon: 'arcade', treatment: 'glow', statStyle: 'text', display: 'Rubik', mono: 'VT323', markStyle: 'underline', elevation: 'sticker', radius: 0, lineWidth: 3 } },
+  'Lab Journal':   { note: 'calm, lined, serif', v: { canvas: 'newsprint', ruling: 'lined', rulingStrength: 70, neon: 'deep', display: 'Fraunces', mono: 'IBM Plex Mono', body: 'IBM Plex Sans', markColor: 'yellow', elevation: 'flat', radius: 10, lineWidth: 2 } },
+  'Legal Pad':     { note: 'yellow pad, poster type', v: { canvas: 'legal', ruling: 'lined', neon: 'synthwave', primary: '3', treatment: 'drop', statStyle: 'chip', display: 'Archivo Black', mono: 'DM Mono', body: 'DM Sans', markStyle: 'half', elevation: 'pinned', radius: 6, cols: '2', width: 1040 } },
+};
+
+let state = { ...DEFAULTS };
+
+// ---------- helpers ----------
+const $ = (id) => document.getElementById(id);
+function lum(hex) {
+  const c = [1, 3, 5].map(i => parseInt(hex.slice(i, i + 2), 16) / 255)
+    .map(x => x <= 0.03928 ? x / 12.92 : ((x + 0.055) / 1.055) ** 2.4);
+  return 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2];
+}
+function contrast(a, b) { const [x, y] = [lum(a), lum(b)].sort((p, q) => q - p); return (x + 0.05) / (y + 0.05); }
+function series() {
+  // Primary first, the rest keep their catalog order.
+  const s = NEONS[state.neon].s, p = +state.primary;
+  return [s[p], ...s.filter((_, i) => i !== p)];
+}
+function seriesNames() { const p = +state.primary; return [NEON_NAMES[p], ...NEON_NAMES.filter((_, i) => i !== p)]; }
+
+// ---------- build controls ----------
+function buildControls() {
+  const fill = (id, entries) => { $(id).innerHTML = entries.map(([v, t]) => `<option value="${v}">${t}</option>`).join(''); };
+  fill('canvas', Object.entries(CANVASES).map(([k, c]) => [k, c.name]));
+  fill('neon', Object.entries(NEONS).map(([k, n]) => [k, n.name]));
+  fill('display', Object.entries(DISPLAY).map(([k, d]) => [k, `${k} — ${d.note}`]));
+  fill('mono', Object.entries(MONO).map(([k, d]) => [k, `${k} — ${d}`]));
+  fill('body', Object.entries(BODY).map(([k, d]) => [k, `${k} — ${d}`]));
+  ['canvas', 'neon', 'display', 'mono', 'body'].forEach(id => $(id).addEventListener('change', e => set(id, e.target.value)));
+  ['rulingStrength', 'lineWidth', 'radius', 'width'].forEach(id => $(id).addEventListener('input', e => set(id, +e.target.value)));
+  document.querySelectorAll('.opts[data-key]').forEach(box => {
+    const key = box.dataset.key;
+    box.innerHTML = Object.entries(CHOICES[key]).map(([v, t]) => `<button class="opt" data-v="${v}">${t}</button>`).join('');
+    box.addEventListener('click', e => { const b = e.target.closest('.opt'); if (b) set(key, b.dataset.v); });
+  });
+  $('presets').innerHTML = Object.entries(PRESETS).map(([k, p]) => `<button class="opt" data-p="${k}">${k}<small>${p.note}</small></button>`).join('');
+  $('presets').addEventListener('click', e => {
+    const b = e.target.closest('.opt'); if (!b) return;
+    state = { ...DEFAULTS, ...PRESETS[b.dataset.p].v }; updateAll();
+  });
+}
+function set(key, v) { state[key] = v; updateAll(); }
+
+function syncControls() {
+  ['canvas', 'neon', 'display', 'mono', 'body', 'rulingStrength', 'lineWidth', 'radius', 'width'].forEach(id => { $(id).value = state[id]; });
+  document.querySelectorAll('.opts[data-key]').forEach(box => {
+    box.querySelectorAll('.opt').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.v === String(state[box.dataset.key]))));
+  });
+  // Show the actual neon colors on the primary buttons.
+  document.querySelectorAll('.opts[data-key=primary] .opt').forEach((b, i) => {
+    b.innerHTML = `<span class="swatch-opt"><i style="background:${NEONS[state.neon].s[i]}"></i></span>${NEON_NAMES[i]}`;
+  });
+  document.querySelectorAll('.opts[data-key=markColor] .opt').forEach(b => {
+    b.innerHTML = `<span class="swatch-opt"><i style="background:${NEONS[state.neon].marks[b.dataset.v]}"></i></span>${CHOICES.markColor[b.dataset.v]}`;
+  });
+  const match = Object.entries(PRESETS).find(([, p]) => Object.keys(DEFAULTS).every(k => String({ ...DEFAULTS, ...p.v }[k]) === String(state[k])));
+  document.querySelectorAll('#presets .opt').forEach(b => b.setAttribute('aria-pressed', String(!!match && b.dataset.p === match[0])));
+}
+
+// ---------- preview ----------
+function rulingCSS(c) {
+  const g = `color-mix(in srgb, ${c.grid} ${state.rulingStrength}%, transparent)`, n = +state.cell;
+  if (state.ruling === 'grid') return { image: `linear-gradient(${g} 1px, transparent 1px), linear-gradient(90deg, ${g} 1px, transparent 1px)`, size: `${n}px ${n}px` };
+  if (state.ruling === 'dots') return { image: `radial-gradient(circle, ${g} 1.4px, transparent 1.6px)`, size: `${n}px ${n}px` };
+  if (state.ruling === 'lined') {
+    const margin = `color-mix(in srgb, #e0607e ${Math.max(state.rulingStrength - 30, 15)}%, transparent)`;
+    return { image: `linear-gradient(90deg, transparent 47px, ${margin} 47px, ${margin} 49px, transparent 49px), linear-gradient(${g} 1px, transparent 1px)`, size: `100% 100%, 100% ${n}px` };
+  }
+  return { image: 'none', size: 'auto' };
+}
+function neonStyle(color) {
+  const c = CANVASES[state.canvas], s = series();
+  switch (state.treatment) {
+    case 'drop':   return `color:${color};text-shadow:2px 2px 0 ${c.ink}`;
+    case 'misreg': return `color:${color};text-shadow:3px 2px 0 color-mix(in srgb, ${s[1]} 70%, transparent);mix-blend-mode:${state.canvas === 'chalk' ? 'normal' : 'multiply'}`;
+    case 'glow':   return `color:${color};text-shadow:0 0 10px color-mix(in srgb, ${color} 70%, transparent), 0 0 2px ${color}`;
+    default:       return `color:${color}`;
+  }
+}
+function statHTML(value, color, label) {
+  const c = CANVASES[state.canvas];
+  let style = neonStyle(color);
+  if (state.statStyle === 'chip') style = `color:${color};background:${state.canvas === 'chalk' ? '#0e0f0d' : c.ink};padding:6px 10px;border-radius:6px`;
+  if (state.statStyle === 'outline') style = `color:${color};border:2px solid ${color};padding:5px 9px;border-radius:6px`;
+  return `<div class="stat"><b style="${style}">${value}</b><span class="label">${label}</span></div>`;
+}
+function markHTML(text) {
+  const m = NEONS[state.neon].marks[state.markColor];
+  if (state.markStyle === 'none') return text;
+  if (state.markStyle === 'half') return `<span style="background:linear-gradient(transparent 52%, ${m} 52%, ${m} 92%, transparent 92%);padding:0 .1em;color:inherit">${text}</span>`;
+  if (state.markStyle === 'underline') return `<span style="text-decoration:underline;text-decoration-color:${series()[0]};text-decoration-thickness:.14em;text-underline-offset:.12em">${text}</span>`;
+  return `<span style="background:${m};color:#1c1b19;border-radius:4px;padding:0 .12em;-webkit-box-decoration-break:clone;box-decoration-break:clone">${text}</span>`;
+}
+function linePath(pts, w, h) {
+  const max = Math.max(...pts), min = Math.min(...pts);
+  return pts.map((v, i) => `${(i / (pts.length - 1) * w).toFixed(1)},${(h - 20 - (v - min) / (max - min) * (h - 50)).toFixed(1)}`).join(' ');
+}
+function cardShadow(pinned) {
+  const c = CANVASES[state.canvas];
+  if (state.elevation === 'sticker' || (state.elevation === 'pinned' && pinned)) return `border-color:${c.ink};box-shadow:3px 3px 0 ${c.ink}`;
+  return '';
+}
+const CRUDE = [62, 64, 68, 73, 79, 81, 77, 72, 67, 64, 66, 70, 75, 78, 80, 77, 73, 69, 71, 75, 80, 83, 85, 84];
+const GAS   = [58, 59, 60, 62, 66, 71, 73, 71, 67, 64, 62, 63, 67, 71, 74, 75, 73, 70, 67, 68, 72, 76, 79, 81];
+const BARS  = [8, 14, 4, 20, 28, 24, 40, 50, 46, 64, 80, 96];
+
+function renderPreview() {
+  const c = CANVASES[state.canvas], s = series(), names = seriesNames(), d = DISPLAY[state.display];
+  const pv = $('pv'), r = rulingCSS(c), lw = state.lineWidth;
+  const marks = NEONS[state.neon].marks;
+  Object.entries({
+    '--canvas': c.canvas, '--paper': c.paper, '--hairline': c.hairline, '--ink': c.ink, '--graphite': c.graphite, '--pencil': c.pencil,
+    '--s4': s[3], '--mark': marks[state.markColor],
+    '--display': `"${state.display}", system-ui, sans-serif`, '--display-w': d.w, '--display-track': d.track,
+    '--mono': `"${state.mono}", ui-monospace, monospace`, '--body': `"${state.body}", system-ui, sans-serif`,
+    '--radius': state.radius + 'px', '--width': state.width + 'px', '--cols': state.cols,
+  }).forEach(([k, v]) => pv.style.setProperty(k, v));
+  $('stage').style.backgroundColor = c.canvas;
+  pv.style.backgroundImage = r.image; pv.style.backgroundSize = r.size;
+  pv.classList.toggle('mono-pixel', state.mono === 'VT323');
+  const tape = state.elevation === 'tape' ? '<div class="tape"></div>' : '';
+  const lines = [[CRUDE, s[0]], [GAS, s[1]]];
+
+  pv.innerHTML = `<main>
+    <header>
+      <div class="label">tempus · design playground · sample data</div>
+      <h1>Neon <span style="${neonStyle(s[0])}">Notebook</span></h1>
+      <p>Quiet paper, loud signal. The numbers below are made up to show the style.</p>
+    </header>
+    <div class="feed">
+      <article class="card" style="${cardShadow(true)}">${tape}
+        <div class="label">Energy / Prices · Monthly · Pinned</div>
+        <h2>Does a move in crude show up in ${markHTML('gasoline CPI')}, and how fast?</h2>
+        <div class="stats">${statHTML('2 mo', s[0], 'peak lag · r = 0.81')}${statHTML('↑ 4.2%', s[1], `gasoline cpi · yoy`)}</div>
+        <svg viewBox="0 0 640 220" role="img" aria-label="Sample line chart">
+          <g stroke="${c.grid}" stroke-width="1">${[20, 80, 140, 200].map(y => `<line x1="0" x2="640" y1="${y}" y2="${y}"/>`).join('')}</g>
+          ${lines.map(([p, col]) => `<polyline fill="none" stroke="${col}" stroke-width="${lw}" stroke-linejoin="round" stroke-linecap="round" points="${linePath(p, 620, 220)}"${state.treatment === 'glow' ? ` style="filter:drop-shadow(0 0 4px ${col})"` : ''}/>`).join('')}
+          ${lines.map(([p, col]) => { const last = linePath(p, 620, 220).split(' ').pop().split(','); return `<circle cx="${last[0]}" cy="${last[1]}" r="${lw + 1.5}" fill="${col}" stroke="${c.ink}" stroke-width="1.5"/>`; }).join('')}
+          <text x="0" y="216">OCT 24</text><text x="300" y="216">OCT 25</text><text x="584" y="216">OCT 26</text><text x="0" y="12">INDEX · 2024-10 = 100</text>
+        </svg>
+        <div class="foot"><span class="chip" style="border-color:${s[0]}">● crude · wti</span><span class="chip" style="border-color:${s[1]}">● cpi · gasoline</span><span class="chip">fred</span><button class="btn">Open card</button></div>
+      </article>
+      <article class="card" style="${cardShadow(false)}">${state.elevation === 'tape' ? '<div class="tape" style="transform:translateX(-50%) rotate(2deg)"></div>' : ''}
+        <div class="label">Food / Prices · Monthly</div>
+        <h2>Is the coffee spike reaching ${markHTML('the grocery shelf')} yet?</h2>
+        <div class="stats">${statHTML('↑ 38%', s[2], 'arabica · 12 mo')}${statHTML('↑ 6.1%', s[3], 'cpi · coffee · 12 mo')}</div>
+        <svg viewBox="0 0 640 150" role="img" aria-label="Sample bar chart">
+          <line x1="0" x2="640" y1="120" y2="120" stroke="${c.hairline}"/>
+          ${BARS.map((v, i) => `<rect x="${8 + i * 52}" y="${120 - v}" width="36" height="${v}" rx="2" fill="${i === BARS.length - 1 ? s[2] : s[3]}"/>`).join('')}
+          <text x="0" y="140">NOV</text><text x="580" y="140">OCT</text><text x="0" y="12">M/M CHANGE · BPS</text>
+        </svg>
+        <p class="notes">Pass-through usually takes six to nine months. The latest bar is the largest monthly move in the sample.</p>
+        <div class="foot"><span class="chip">fred</span><span class="chip">bls</span></div>
+      </article>
+    </div>
+    <section class="card">
+      <div class="label">Palette · contrast vs paper (≥ 3:1 needed for large type and chart lines)</div>
+      <div class="palette">
+        ${s.map((col, i) => { const r = contrast(col, c.paper); return `<div class="sw"><i style="background:${col}"></i><span class="label ${r >= 3 ? 'ok' : 'bad'}">${i === 0 ? 'primary · ' : ''}${names[i]} ${r.toFixed(1)}</span></div>`; }).join('')}
+        ${Object.entries(marks).map(([k, col]) => `<div class="sw"><i style="background:${col}"></i><span class="label">${k} mark · ink ${contrast(col, '#1c1b19').toFixed(1)}</span></div>`).join('')}
+      </div>
+    </section>
+  </main>`;
+}
+
+// ---------- prompt ----------
+function updatePrompt() {
+  const c = CANVASES[state.canvas], s = series(), names = seriesNames(), changed = k => String(state[k]) !== String(DEFAULTS[k]);
+  const parts = [];
+  if (changed('canvas')) parts.push(`Switch the paper to "${c.name}": canvas ${c.canvas}, paper ${c.paper}, grid ${c.grid}, hairline ${c.hairline}, ink ${c.ink}, graphite ${c.graphite}, pencil ${c.pencil}.${state.canvas === 'chalk' ? ' This makes the theme dark, so ink becomes the light text color.' : ''}`);
+  if (changed('ruling') || changed('rulingStrength') || changed('cell')) {
+    const kind = { grid: 'a graph-paper grid', dots: 'a dot grid', lined: 'ruled lines with a red margin line', none: 'no ruling' }[state.ruling];
+    const str = state.rulingStrength >= 90 ? 'at full strength' : state.rulingStrength >= 50 ? `softened to about ${state.rulingStrength}%` : `very faint (about ${state.rulingStrength}%)`;
+    parts.push(state.ruling === 'none' ? 'Remove the canvas ruling and leave the page plain.' : `Use ${kind} on the canvas, ${state.cell}px apart, ${str}.`);
+  }
+  if (changed('neon') || changed('primary')) parts.push(`Use the "${NEONS[state.neon].name}" neon set with series order ${s.map((col, i) => `${names[i]} ${col}`).join(', ')}; ${names[0]} (${s[0]}) is the primary color.`);
+  if (changed('neon') || changed('markColor')) parts.push(`Highlighter marks use ${state.markColor} ${NEONS[state.neon].marks[state.markColor]}.`);
+  const low = s.map((col, i) => [names[i], contrast(col, c.paper)]).filter(([, r]) => r < 3);
+  if (low.length) parts.push(`Note: ${low.map(([n, r]) => `${n} (${r.toFixed(1)}:1)`).join(', ')} fall below 3:1 on paper, so limit them to chart marks or adjust them darker.`);
+  if (changed('treatment')) parts.push({ drop: 'Give neon display type and stat figures a hard 2px ink drop shadow.', misreg: 'Give neon type a riso-style misregistration: a 3px offset shadow in the second neon, multiplied.', glow: 'Give neon type and chart lines a soft glow (this reverses the current "no glows" rule in Do\'s and Don\'ts).', flat: 'Keep neon type flat.' }[state.treatment]);
+  if (changed('statStyle')) parts.push(state.statStyle === 'chip' ? 'Set stat figures as neon text on a small ink chip (6px radius).' : 'Set stat figures as neon text inside a 2px neon outline box.');
+  if (changed('lineWidth')) parts.push(`Chart lines are ${state.lineWidth}px${state.lineWidth > 2.5 ? ', heavier and more marker-like' : ', finer and more pen-like'}.`);
+  if (changed('display')) parts.push(`Change the display face to ${state.display} (${DISPLAY[state.display].note}), weight ${DISPLAY[state.display].w}, tracking ${DISPLAY[state.display].track}.`);
+  if (changed('mono')) parts.push(`Change the mono/label face to ${state.mono} (${MONO[state.mono]})${state.mono === 'VT323' ? '; it runs small, so bump labels to about 15px and use it only for labels, not stat figures' : ''}.`);
+  if (changed('body')) parts.push(`Change the body face to ${state.body} (${BODY[state.body]}).`);
+  if (changed('markStyle')) parts.push({ half: 'Draw the highlighter across the lower half of the phrase only, like a quick marker swipe.', underline: 'Replace the highlighter fill with a thick primary-neon underline.', none: 'Drop the highlighter on card questions.', block: 'Use a full block highlighter.' }[state.markStyle]);
+  if (changed('elevation')) parts.push({ flat: 'Make every card flat, including pinned ones (no sticker shadow).', sticker: 'Give every card the hard 3px ink sticker shadow, not just pinned ones.', tape: 'Instead of shadows, pin cards with a translucent strip of highlighter-colored tape across the top edge.', pinned: 'Use the sticker shadow on pinned cards only.' }[state.elevation]);
+  if (changed('radius')) parts.push(`Card corner radius ${state.radius}px${state.radius === 0 ? ' (square, ledger-like)' : state.radius < 10 ? ' (crisp)' : ' (soft)'}.`);
+  if (changed('width') || changed('cols')) parts.push(`Feed is ${state.cols === '2' ? 'two columns' : 'one column'} with a ${state.width}px max width.`);
+
+  const intro = 'Update the Neon Notebook design in docs/DESIGN.md (tokens and prose) and docs/design/preview.html to match these choices. Keep lint clean (npx @google/design.md lint docs/DESIGN.md).';
+  $('prompt').textContent = parts.length ? `${intro}\n\n- ${parts.join('\n- ')}` : 'No changes yet. The controls match the current docs/DESIGN.md. Adjust something or pick a preset.';
+}
+
+function updateAll() { syncControls(); renderPreview(); updatePrompt(); }
+
+$('copy').addEventListener('click', async () => {
+  try { await navigator.clipboard.writeText($('prompt').textContent); $('copy').textContent = 'Copied!'; }
+  catch { $('copy').textContent = 'Select & copy'; }
+  setTimeout(() => { $('copy').textContent = 'Copy prompt'; }, 1400);
+});
+
+buildControls();
+updateAll();
+</script>
+</body>
+</html>

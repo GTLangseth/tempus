@@ -24,4 +24,5 @@ and why. Skip this for refactors and bug fixes.
   choices: pick a default and log it under **Open decisions** in `docs/STACK.md`.
 - New tool or dependency: add a row to the register in `docs/STACK.md` with its license,
   the alternatives considered, and a revisit trigger.
+- Visual work follows `docs/DESIGN.md` (design.md format); run `mise run design:lint` after editing it.
 - New provider: implement `Source` in `src/tempus/sources/` and register it in `sources/__init__.py`.
