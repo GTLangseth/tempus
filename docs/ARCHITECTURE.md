@@ -37,6 +37,7 @@ and the quarterly review procedure live in [`STACK.md`](STACK.md).
 | Navigation | ✅ built | `src/tempus/navigate.py` | Phrase → concepts → series by beam search down the tree (Jev, or a labeled lexical fallback with no key): `/api/navigate`, `tempus resolve` |
 | CLI | ✅ built | `src/tempus/cli.py` | `tempus` commands for data actions: sync, catalog, inspect, search, resolve |
 | Repo tooling | ✅ built | `mise.toml` | Pins tools (Python, uv, Node) and runs repo tasks (setup, db, test, lint) |
+| Home base | 🟡 runbook ready | `docs/HOMEBASE.md`, `scripts/homebase/` | Mac mini on Tailscale: real DB and keys, `tempus serve` under launchd published with `tailscale serve`, SSH + tmux for agents from the phone (`mise run homebase:setup`) |
 | Scheduler | 🟡 minimal | `tempus sync --every 6h` | A blocking loop for now; see open questions |
 | Cards | ✅ built | `cards/`, `src/tempus/cards/` | Card language v1 (inputs, formulas, panels), static checks, Polars engine, panel payloads |
 | App | ✅ built | `src/tempus/app.py`, `src/tempus/explore.py`, `src/tempus/web/` | `tempus serve`: FastAPI engine API + no-build static front end (ECharts, three.js), hot reload |
@@ -155,6 +156,13 @@ By the horizon in [`SOUL.md`](SOUL.md) where it first matters. Status: ✅ built
 
 Newest first. Each entry: what we chose, and why.
 
+- **2026-10-04 · A Mac mini is the home base, reached over Tailscale.** The real database,
+  API keys and long-running agents live on one always-on machine at home. Everything binds
+  to localhost (the app, and now Postgres in `docker-compose.yml`). Tailscale publishes the
+  app to the tailnet only (`tailscale serve`), SSH is the way in, and other devices reach the
+  database through an SSH tunnel. Cloud routines keep doing code-only work. `tailscaled` runs
+  as a system daemon, so it's up before login, and Colima replaces Docker Desktop there.
+  Runbook: `docs/HOMEBASE.md`.
 - **2026-10-04 · Draft placements: a temporary, user-approved exception to "Jev decides".**
   To make the explore view useful before any Jev filing has run, a Claude session placed
   all 1,965 snapshot series in the tree by hand-reviewed rules, in batches, with 29 judgment

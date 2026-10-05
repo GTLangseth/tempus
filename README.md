@@ -39,6 +39,12 @@ fallback when it isn't. Snapshot series have no data until synced: with `FRED_AP
 series page syncs on first open; otherwise run `tempus catalog add fred <ID> --sync`. The
 draft placements were written by Claude; `tempus ontology file` lets Jev decide them.
 
+## Home base
+
+To run tempus on an always-on Mac (database, keys, app reachable from your phone over
+Tailscale, agents in `tmux`), follow [docs/HOMEBASE.md](docs/HOMEBASE.md):
+`mise run homebase:setup`, then `mise run homebase:status`.
+
 ## CLI
 
 ```sh
