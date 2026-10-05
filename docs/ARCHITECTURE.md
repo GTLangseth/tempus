@@ -34,6 +34,7 @@ and the quarterly review procedure live in [`STACK.md`](STACK.md).
 | Filing | ✅ built | `src/tempus/filing.py`, `src/tempus/jev.py` | Places series in the tree by walking it top-down with TypeSafe's Jev; pins in `catalog.toml` override |
 | CLI | ✅ built | `src/tempus/cli.py` | `tempus` commands for data actions: sync, catalog, inspect, search |
 | Repo tooling | ✅ built | `mise.toml` | Pins tools (Python, uv, Node) and runs repo tasks (setup, db, test, lint) |
+| Home base | 🟡 runbook ready | `docs/HOMEBASE.md`, `scripts/homebase/` | Mac mini on Tailscale: real DB and keys, `tempus serve` under launchd published with `tailscale serve`, SSH + tmux for agents from the phone (`mise run homebase:setup`) |
 | Scheduler | 🟡 minimal | `tempus sync --every 6h` | A blocking loop for now; see open questions |
 | Cards | ✅ built | `cards/`, `src/tempus/cards/` | Card language v1 (inputs, formulas, panels), static checks, Polars engine, panel payloads |
 | App | ✅ built | `src/tempus/app.py`, `src/tempus/web/` | `tempus serve`: FastAPI engine API + no-build static front end (ECharts), hot reload |
@@ -143,6 +144,14 @@ By the horizon in [`SOUL.md`](SOUL.md) where it first matters. Status: ✅ built
 ## Decisions
 
 Newest first. Each entry: what we chose, and why.
+
+- **2026-10-04 · A Mac mini is the home base, reached over Tailscale.** The real database,
+  API keys and long-running agents live on one always-on machine at home. Everything binds
+  to localhost (the app, and now Postgres in `docker-compose.yml`). Tailscale publishes the
+  app to the tailnet only (`tailscale serve`), SSH is the way in, and other devices reach the
+  database through an SSH tunnel. Cloud routines keep doing code-only work. `tailscaled` runs
+  as a system daemon, so it's up before login, and Colima replaces Docker Desktop there.
+  Runbook: `docs/HOMEBASE.md`.
 
 - **2026-10-04 · Cards are evaluated in a Python engine; the web app reads through it.**
   This reverses "the web app reads TimescaleDB directly": cards are the shared logic that
