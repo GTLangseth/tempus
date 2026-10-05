@@ -25,17 +25,27 @@ todo() { printf '  ! %s\n' "$*"; TODO+=("$*"); }
 command -v brew >/dev/null || { echo "Install Homebrew first: https://brew.sh (see docs/HOMEBASE.md step 0)" >&2; exit 1; }
 BREW_PREFIX="$(brew --prefix)"
 
+# Reuse what's already on the Mac instead of running a second copy alongside it.
+TS_APP=0; [[ -d /Applications/Tailscale.app ]] && TS_APP=1
+DOCKER_READY=0
+if command -v docker >/dev/null && docker info >/dev/null 2>&1 && [[ "$(docker context show 2>/dev/null)" != colima ]]; then
+  DOCKER_READY=1
+fi
+
 step "Asking for your password once (power settings, Remote Login, Tailscale daemon)"
 sudo -v
 
 # --- packages ---------------------------------------------------------------------------
 step "Homebrew packages"
-for pkg in tailscale colima docker docker-compose tmux gh; do
+PKGS=(tmux gh)
+((TS_APP)) || PKGS+=(tailscale)
+((DOCKER_READY)) || PKGS+=(colima docker docker-compose)
+for pkg in "${PKGS[@]}"; do
   if brew list --formula "$pkg" >/dev/null 2>&1; then ok "$pkg"; else brew install "$pkg"; ok "$pkg installed"; fi
 done
 
 # Let `docker compose` find Homebrew's compose plugin.
-python3 - "$BREW_PREFIX/lib/docker/cli-plugins" <<'PY'
+((DOCKER_READY)) || python3 - "$BREW_PREFIX/lib/docker/cli-plugins" <<'PY'
 import json, pathlib, sys
 cfg = pathlib.Path.home() / ".docker" / "config.json"
 cfg.parent.mkdir(exist_ok=True)
@@ -45,7 +55,7 @@ if sys.argv[1] not in dirs:
     dirs.append(sys.argv[1])
     cfg.write_text(json.dumps(data, indent=2))
 PY
-ok "docker compose plugin registered"
+((DOCKER_READY)) || ok "docker compose plugin registered"
 
 # --- always on --------------------------------------------------------------------------
 step "Power: never sleep, restart after a power failure"
@@ -66,6 +76,14 @@ if fdesetup status 2>/dev/null | grep -q "On"; then
 fi
 
 # --- tailscale ----------------------------------------------------------------------------
+if ((TS_APP)); then
+  step "Tailscale (Tailscale.app: up once you log in)"
+  if tailscale status >/dev/null 2>&1; then
+    ok "joined tailnet as $(tailscale status --json | python3 -c 'import json,sys; print(json.load(sys.stdin)["Self"]["DNSName"].rstrip("."))')"
+  else
+    todo "Open Tailscale.app, sign in, and turn on its 'Launch at login' setting, then re-run setup"
+  fi
+else
 step "Tailscale (tailscaled as a system daemon: up before login, survives reboots)"
 if sudo launchctl print system/com.tailscale.tailscaled >/dev/null 2>&1; then
   ok "tailscaled daemon installed"
@@ -81,10 +99,17 @@ else
   sudo tailscale up --operator="$USER"   # so later tailscale commands work without sudo
   ok "joined tailnet"
 fi
+fi
 
 # --- containers ---------------------------------------------------------------------------
-step "Colima (headless Docker runtime), started at login"
-if colima status >/dev/null 2>&1; then ok "colima running"; else brew services start colima; sleep 5; colima status >/dev/null 2>&1 || colima start; ok "colima started"; fi
+if ((DOCKER_READY)); then
+  step "Docker: reusing the running engine ($(docker info --format '{{.OperatingSystem}}' 2>/dev/null))"
+  ok "skipping Colima"
+  [[ -d /Applications/Docker.app ]] && todo "Make sure Docker Desktop → Settings → General → 'Start Docker Desktop when you sign in' is on"
+else
+  step "Colima (headless Docker runtime), started at login"
+  if colima status >/dev/null 2>&1; then ok "colima running"; else brew services start colima; sleep 5; colima status >/dev/null 2>&1 || colima start; ok "colima started"; fi
+fi
 
 # --- tempus -------------------------------------------------------------------------------
 step "tempus checkout at $REPO"
@@ -96,6 +121,13 @@ test -f .env || cp .env.example .env
 for key in FRED_API_KEY TYPESAFE_API_KEY; do
   if grep -Eq "^${key}=.+" .env; then ok "$key set"; else todo "Add $key to $REPO/.env"; fi
 done
+# Another Postgres may already hold the default port; compose reads TEMPUS_DB_PORT from .env.
+DB_PORT="$(sed -n 's/^TEMPUS_DB_PORT=//p' .env)"; DB_PORT="${DB_PORT:-5432}"
+if lsof -nP -iTCP:"$DB_PORT" -sTCP:LISTEN >/dev/null 2>&1 && ! docker ps --format '{{.Names}} {{.Ports}}' | grep -q "^tempus-db .*:$DB_PORT->"; then
+  echo "Port $DB_PORT is taken by something else. In $REPO/.env set TEMPUS_DB_PORT to a free port" >&2
+  echo "and point DATABASE_URL at it (e.g. 5433), then re-run." >&2
+  exit 1
+fi
 mise exec -- uv sync --quiet
 mise run db:up
 mise exec -- uv run tempus db init
@@ -146,7 +178,8 @@ fi
 
 step "Publish tempus to your tailnet only (tailscale serve → HTTPS)"
 for _ in 1 2 3 4 5 6 7 8 9 10; do curl -sf "http://127.0.0.1:$PORT/api/cards" >/dev/null && break; sleep 1; done
-if sudo tailscale serve --bg "$PORT" >/dev/null 2>&1; then
+TS_SERVE=(sudo tailscale serve); ((TS_APP)) && TS_SERVE=(tailscale serve)   # the app's CLI runs as you
+if "${TS_SERVE[@]}" --bg "$PORT" >/dev/null 2>&1; then
   ok "$(tailscale serve status 2>/dev/null | head -1)"
 else
   todo "Enable HTTPS certificates in the Tailscale admin console (DNS page), then re-run: sudo tailscale serve --bg $PORT"
