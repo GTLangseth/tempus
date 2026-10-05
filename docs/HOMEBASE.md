@@ -76,22 +76,20 @@ mise run homebase:status       # on the mini: every line should be ✓
 
 From your phone, open `https://<mini>.<tailnet>.ts.net`. You should see the tempus app.
 
-## Load tonight's explore tree (PR #5)
+## Load the explore tree
 
-Until PR #5 is merged, check out its branch on the mini:
+The 3D tree of ~2,000 FRED series ships with main. After setup:
 
 ```sh
 cd ~/tempus
-git fetch && git checkout grantlangseth/spa-23-explore-view-in-the-static-app-concept-tree-and-series-pages
-uv sync
-uv run tempus db init
-uv run tempus catalog import-snapshot data/fred/series-snapshot.json
-uv run tempus ontology load
-launchctl kickstart -k gui/$(id -u)/com.tempus.serve     # restart the app on the new code
+uv run tempus catalog import-snapshot data/fred/series-snapshot.json   # metadata for 1,965 series
+uv run tempus ontology load                                            # 174 concepts + draft placements
+launchctl kickstart -k gui/$(id -u)/com.tempus.serve                   # restart the app
 ```
 
-Once PR #5 is merged: `git checkout main && git pull`, then the same last five commands.
-To have Jev re-decide Claude's draft placements: `uv run tempus ontology file` (slow: ~2,000 series).
+Then open `https://<mini>.<tailnet>.ts.net`, press `/` and describe a series. With
+`TYPESAFE_API_KEY` set, the answer panel says **jev**. To have Jev re-decide Claude's draft
+placements: `uv run tempus ontology file` (slow: ~2,000 series; run it in `tmux`).
 
 ## Agents on the go
 
