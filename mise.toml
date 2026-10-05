@@ -65,6 +65,14 @@ print(f"Stack review current: last reviewed {m.group(1)} ({days} days ago); due 
 PY
 '''
 
+[tasks."homebase:setup"]
+description = "Provision this Mac as the always-on home base (docs/HOMEBASE.md); add -- --with-sync to schedule syncs"
+run = "bash scripts/homebase/setup.sh"
+
+[tasks."homebase:status"]
+description = "Home base health: tailnet, serve, Remote Login, Colima, DB, launchd agents"
+run = "bash scripts/homebase/status.sh"
+
 [tasks.test]
 description = "Run the test suite"
 run = "uv run pytest"

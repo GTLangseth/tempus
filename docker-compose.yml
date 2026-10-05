@@ -8,7 +8,9 @@ services:
       POSTGRES_PASSWORD: ${TEMPUS_DB_PASSWORD:-password}
       POSTGRES_DB: ${TEMPUS_DB_NAME:-tempus}
     ports:
-      - "${TEMPUS_DB_PORT:-5432}:5432"
+      # Localhost only: on the home base, reach the DB from other devices with an SSH tunnel
+      # over Tailscale (docs/HOMEBASE.md), never by exposing Postgres to the network.
+      - "127.0.0.1:${TEMPUS_DB_PORT:-5432}:5432"
     volumes:
       # The image runs as a non-root user; mounting over its own data dir keeps ownership right.
       - tempus-pgdata:/home/postgres/pgdata

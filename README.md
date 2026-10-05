@@ -20,6 +20,12 @@ mise run setup        # .env, uv sync, start db, apply schema
 mise run sync
 ```
 
+## Home base
+
+To run tempus on an always-on Mac (database, keys, app reachable from your phone over
+Tailscale, agents in `tmux`), follow [docs/HOMEBASE.md](docs/HOMEBASE.md):
+`mise run homebase:setup`, then `mise run homebase:status`.
+
 ## CLI
 
 ```sh
