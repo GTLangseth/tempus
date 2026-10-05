@@ -47,6 +47,7 @@ def test_load_builds_dotted_ids(roots):
         ("- {id: Labor, name: L, description: d}", "snake_case"),
         ("- {id: a, name: A, description: d}\n- {id: a, name: B, description: d}", "duplicate"),
         ("- {id: a, name: A}", "missing description"),
+        ("- id: a\n  name: A\n  description: H.4.1: total", "invalid YAML"),
     ],
 )
 def test_load_rejects_invalid_trees(tmp_path, yaml_text, message):

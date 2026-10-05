@@ -28,8 +28,15 @@ class Concept:
 
 def load(path: Path) -> list[Concept]:
     """Parse and validate the YAML tree. Returns the top-level concepts."""
-    raw = yaml.safe_load(path.read_text()) or []
+    raw = _read_yaml(path) or []
     return _parse(raw, parent_id=None, where=path.name)
+
+
+def _read_yaml(path: Path):
+    try:
+        return yaml.safe_load(path.read_text())
+    except yaml.YAMLError as exc:
+        raise OntologyError(f"{path.name}: invalid YAML: {exc}") from exc
 
 
 def _parse(nodes, parent_id: str | None, where: str) -> list[Concept]:
@@ -140,7 +147,7 @@ def load_drafts(path: Path) -> dict[tuple[str, str], Draft]:
     """Parse ontology/placements.draft.yaml: concept id -> series refs. Missing file = none."""
     if not path.exists():
         return {}
-    raw = yaml.safe_load(path.read_text()) or {}
+    raw = _read_yaml(path) or {}
     if not isinstance(raw, dict) or raw.get("version") != DRAFTS_VERSION:
         raise OntologyError(f"{path.name}: expected `version: {DRAFTS_VERSION}`")
     drafts: dict[tuple[str, str], Draft] = {}
