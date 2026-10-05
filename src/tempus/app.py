@@ -53,12 +53,17 @@ def default_sync_source(settings: Settings) -> SourceFactory | None:
 
 
 def create_app(
-    settings: Settings | None = None, sync_source: SourceFactory | None = None
+    settings: Settings | None = None,
+    sync_source: SourceFactory | None = None,
+    guest: bool = False,
 ) -> FastAPI:
+    """`guest=True` is the shared (Funnel) app: read-only, so series pages never sync, and no
+    API docs."""
     settings = settings or get_settings()
-    sync_source = sync_source or default_sync_source(settings)
+    sync_source = None if guest else sync_source or default_sync_source(settings)
     repo = FileCardRepository(settings.cards_path)
-    app = FastAPI(title="tempus")
+    docs = {"docs_url": None, "redoc_url": None, "openapi_url": None} if guest else {}
+    app = FastAPI(title="tempus", **docs)
 
     def summaries() -> list[dict]:
         out = []

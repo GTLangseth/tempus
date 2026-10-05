@@ -717,11 +717,36 @@ def card_panels(name: str | None = typer.Argument(None)):
 
 
 @app.command()
-def serve(port: int = typer.Option(8765), host: str = typer.Option("127.0.0.1")):
+def serve(
+    port: int = typer.Option(8765),
+    host: str = typer.Option("127.0.0.1"),
+    share: bool = typer.Option(
+        False, help="Guest app for Tailscale Funnel: read-only, behind TEMPUS_SHARE_PASSWORD"
+    ),
+    until: float | None = typer.Option(None, help="With --share: stop serving at this epoch"),
+):
     """Run the tempus app: browse concepts and cards, with live reload on save."""
     import uvicorn
 
     from tempus.app import create_app
 
-    console.print(f"tempus → [bold]http://{host}:{port}[/bold]")
-    uvicorn.run(create_app(), host=host, port=port, log_level="warning")
+    if not share:
+        console.print(f"tempus → [bold]http://{host}:{port}[/bold]")
+        uvicorn.run(create_app(), host=host, port=port, log_level="warning")
+        return
+
+    from tempus.share import ShareGate
+
+    settings = get_settings()
+    if host != "127.0.0.1":
+        raise typer.BadParameter("--share binds 127.0.0.1 only; Funnel does the publishing")
+    if not settings.share_password:
+        console.print("[red]Set TEMPUS_SHARE_PASSWORD in .env (or run `mise run share:on`).[/red]")
+        raise typer.Exit(1)
+    try:
+        app_ = ShareGate(create_app(settings, guest=True), settings.share_password, until)
+    except ValueError as exc:
+        console.print(f"[red]{exc}[/red]")
+        raise typer.Exit(1) from exc
+    console.print(f"tempus (shared, password-gated) → [bold]http://{host}:{port}[/bold]")
+    uvicorn.run(app_, host=host, port=port, log_level="warning", proxy_headers=False)
