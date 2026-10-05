@@ -13,7 +13,7 @@
 
 - id: output
   name: Output & Growth
-  description: Size and growth of the whole economy and its production. GDP and GDI, the expenditure components of GDP other than consumer spending, industrial production, capacity utilization, productivity and energy use.
+  description: Size and growth of the whole economy and its production. GDP and GDI, the expenditure components of GDP other than consumer spending (including private fixed investment by type and government consumption and investment, defense included), shares of GDP or of GDI held by any component (compensation of employees, corporate profits, government), national saving, industrial production, capacity utilization, productivity, capital stock, energy use and carbon dioxide emissions.
   children:
     - id: gdp
       name: Gross Domestic Product
@@ -30,7 +30,7 @@
           description: Gross domestic income (GDI), national income, net national product, the average of GDP and GDI, and gross or net national saving.
     - id: gdp_components
       name: GDP Components
-      description: Expenditure components of GDP other than personal consumption (which is under Households › Spending). Private investment (residential, nonresidential, equipment, software, structures), inventory change, government consumption and investment, and contributions to or shares of GDP growth.
+      description: Expenditure components of GDP other than personal consumption (which is under Households › Spending). Private investment (residential, nonresidential, equipment, software, structures), inventory change, government consumption and investment, contributions to GDP growth, and the share of GDP or GDI held by any component (compensation of employees, wages and salaries, corporate profits).
       children:
         - id: investment
           name: Private Investment
@@ -40,7 +40,7 @@
           description: Government consumption expenditures and gross investment as a GDP component (federal, defense, state and local), real or nominal, or as a share of GDP. Not budget outlays.
         - id: contributions
           name: Contributions & Shares
-          description: Contributions of each component or industry to real GDP growth (percentage points), and component shares of GDP or of GDI.
+          description: Contributions of each component or industry to real GDP growth (percentage points), and component shares of GDP or of GDI, such as compensation of employees, wages and salaries or corporate profits as a share of GDI.
     - id: industrial_production
       name: Industrial Production & Capacity
       description: Output of manufacturing, mining and utilities, capacity utilization, motor vehicle production, and gross output or value added by industry.
@@ -73,7 +73,7 @@
 
 - id: labor
   name: Labor Market
-  description: Jobs, workers and pay. Unemployment, employment and payrolls, participation, wages and earnings, hours, jobless claims, job openings and turnover, and job postings.
+  description: Jobs, workers and pay. Unemployment, employment and payrolls, participation, wages and earnings, compensation of employees and wages and salaries as dollar levels, hours, jobless claims, job openings and turnover, and job postings. Not compensation as a share of GDI or GDP (Output & Growth).
   children:
     - id: unemployment
       name: Unemployment
@@ -126,7 +126,7 @@
           description: The employment cost index (ECI) for total compensation or wages and salaries, all civilian or private industry, by industry.
         - id: compensation
           name: Compensation & Aggregate Payrolls
-          description: Aggregate compensation of employees, wage and salary disbursements, total wages and salaries, and indexes of aggregate weekly payrolls; labor compensation shares of income.
+          description: Aggregate compensation of employees, wage and salary disbursements, total wages and salaries, and indexes of aggregate weekly payrolls, as dollar levels. Shares of GDI are under Output › GDP Components.
         - id: minimum_wage
           name: Minimum Wage
           description: Federal or state minimum hourly wage rates, and the share of workers paid at or below the minimum wage.
@@ -145,7 +145,7 @@
 
 - id: prices
   name: Prices & Inflation
-  description: How fast prices are changing. Consumer prices (CPI, PCE), producer prices (PPI), import and export prices, economy-wide deflators, inflation expectations and commodity prices.
+  description: How fast prices are changing. Consumer prices (CPI, PCE), producer prices (PPI), import and export prices, economy-wide deflators, inflation expectations and commodity prices. Not stock indexes of commodity producers such as gold-miner indexes (Financial Markets).
   children:
     - id: consumer
       name: Consumer Prices
@@ -242,7 +242,7 @@
 
 - id: rates
   name: Interest Rates & Monetary Policy
-  description: The price of money and the stance of the central bank. Policy rates, money-market rates, Treasury yields, corporate bond yields, spreads, mortgage and consumer loan rates, money supply and the Fed balance sheet.
+  description: The price of money and the stance of the central bank. Policy rates, money-market rates, Treasury yields, real risk and term premia, corporate bond yields, spreads, mortgage and consumer loan rates; money supply and its components (currency, demand deposits, small-denomination time deposits, retail money market funds) and total reserves; and the Federal Reserve's own balance sheet (H.4.1), meaning total assets, securities held outright by type and maturity, loans and primary credit, reverse repurchase agreements, the Treasury General Account, remittances due to the Treasury and custody holdings for foreign accounts.
   children:
     - id: policy
       name: Policy Rates
@@ -256,7 +256,7 @@
           description: Rates the Fed sets directly other than the fed funds target; interest on reserve balances (IORB), overnight reverse repo offering and award rates, the discount rate and primary credit rate, and the standing repo facility rate.
     - id: money_markets
       name: Money Market Rates
-      description: Short-term funding rates in private markets; repo rates (SOFR, TGCR), unsecured bank funding (OBFR, AMERIBOR, interbank rates), commercial paper rates and outstanding, the bank prime rate, and their volumes.
+      description: Short-term funding rates in private markets; repo rates (SOFR, TGCR), unsecured bank funding (OBFR, AMERIBOR, interbank rates), commercial paper rates and outstanding, the bank prime rate, and their volumes. Not money fund balances or reverse repos on the Fed's balance sheet (Money & Fed Balance Sheet).
       children:
         - id: repo
           name: Repo & SOFR
@@ -269,7 +269,7 @@
           description: Commercial paper interest rates (financial, nonfinancial, asset-backed) and the amount of commercial paper outstanding.
     - id: treasury
       name: Treasury Yields
-      description: Yields on US Treasury bills, notes and bonds, nominal or inflation-indexed (TIPS), at a specific maturity, plus fitted zero-coupon yields, forward rates and term premia.
+      description: Yields on US Treasury bills, notes and bonds, nominal or inflation-indexed (TIPS), at a specific maturity, plus fitted zero-coupon yields, forward rates, and term and real risk premia.
       children:
         - id: bills
           name: Bills & Short Maturities
@@ -282,7 +282,7 @@
           description: Inflation-indexed Treasury yields (TIPS, DFII10), individual TIPS issues, the long-term inflation-indexed average, and model-based real interest rates.
         - id: term_structure
           name: Yield Curve Models & Term Premia
-          description: Fitted zero-coupon yields, instantaneous forward rates, and term premia on Treasuries (Kim-Wright, ACM style models).
+          description: Fitted zero-coupon yields, instantaneous forward rates, term premia on Treasuries (Kim-Wright, ACM style models), and the Cleveland Fed real risk premium.
     - id: corporate
       name: Corporate Bond Yields
       description: Yields on corporate bonds; ICE BofA corporate and high-yield index effective yields and yields to worst by rating or maturity, Moody's Aaa and Baa seasoned yields, and the high quality market (HQM) corporate yield curve.
@@ -304,14 +304,14 @@
       description: Interest rates banks charge consumers or pay depositors; credit card, auto loan and personal loan rates, finance company new car loan terms, and national savings, checking, money market and CD rates.
     - id: money
       name: Money & Fed Balance Sheet
-      description: Money supply (M1, M2), monetary base, velocity, bank reserves, and Federal Reserve assets and liabilities (H.4.1) and open market operations.
+      description: Money supply (M1, M2) and its components such as retail money market fund balances, monetary base, velocity, bank reserves, and Federal Reserve assets and liabilities (H.4.1), including reverse repurchase agreements with foreign official and other accounts and securities in custody for foreign and international accounts, and open market operations.
       children:
         - id: supply
           name: Money Supply
           description: Monetary aggregates and components (M1, M2, M3, real M1 and M2, currency, demand deposits, other liquid deposits, small time deposits, retail money market funds), the monetary base, and money velocity.
         - id: fed_assets
           name: Fed Assets
-          description: Federal Reserve total assets (WALCL) and securities held outright (Treasuries by maturity, mortgage-backed securities), loans and primary credit, central bank liquidity swaps, repos held, and gold.
+          description: Federal Reserve total assets (WALCL) and securities held outright (Treasuries by maturity, mortgage-backed securities), loans and primary credit, central bank liquidity swaps, repos held, and gold. Not securities held by commercial banks (Banking & Credit).
         - id: fed_liabilities
           name: Reserves & Fed Liabilities
           description: Reserve balances with Federal Reserve banks, total reserves and borrowings, the Treasury General Account, reverse repurchase agreements, currency in circulation, remittances to Treasury, and custody holdings for foreign accounts.
@@ -321,7 +321,7 @@
 
 - id: households
   name: Households & Consumers
-  description: Income, spending, saving, debt, wealth and sentiment of households.
+  description: Income, spending, saving, debt, wealth and sentiment of households. Personal income including government social benefits and transfer receipts, consumer purchases (PCE, retail sales by store type, motor vehicle sales and new car registrations), personal and gross private saving, consumer credit and household debt (levels or growth), and household balance sheet holdings such as checkable deposits and currency.
   children:
     - id: income
       name: Income
@@ -335,7 +335,7 @@
           description: Median or mean household, family or personal income (Census), income by quintile or age, Gini coefficients, and poverty rates, nationally, by state or county.
     - id: spending
       name: Retail & Consumer Spending
-      description: Personal consumption expenditures (PCE), retail sales, vehicle sales and other direct measures of consumer purchases.
+      description: Personal consumption expenditures (PCE), retail sales, vehicle sales and passenger car registrations, and other direct measures of consumer purchases.
       children:
         - id: pce
           name: Personal Consumption Expenditures
@@ -345,7 +345,7 @@
           description: Monthly retail and food services sales (advance or final), in total or by store type (gasoline, grocery, clothing, restaurants), real retail sales, and e-commerce sales.
         - id: vehicles
           name: Vehicle Sales
-          description: Light vehicle and total vehicle sales (units, SAAR), autos and light or heavy trucks, and new car registrations.
+          description: Light vehicle and total vehicle sales (units, SAAR), autos and light or heavy trucks, and new or total passenger car registrations.
         - id: card_spending
           name: Spending Surveys & Card Data
           description: Consumer expenditure survey spending by age or income, and card-based spending momentum indexes (Visa).
@@ -378,7 +378,7 @@
 
 - id: housing
   name: Housing
-  description: Residential real estate activity, prices, ownership and mortgage debt.
+  description: Residential real estate activity, prices, ownership and mortgage debt. Not foreclosures or delinquencies (Banking & Credit). Homeownership rates (including Consumer Expenditure Survey percent homeowner by age), one-to-four-family residential mortgage debt for any holder sector, and mortgage originations. Not the dollar value of construction spending (Business Activity).
   children:
     - id: construction
       name: Starts & Permits
@@ -415,7 +415,7 @@
 
 - id: business
   name: Business Activity
-  description: Firms' orders, inventories and sales, profits, balance sheets, surveys, new business formation, construction spending and freight and transportation activity.
+  description: Firms' orders, inventories and sales, profits as dollar levels, balance sheets, surveys, new business formation and patents granted, construction spending (residential included) and freight and transportation activity. Not private fixed investment from the GDP accounts or profit shares of GDI (Output & Growth), not retail or vehicle sales to consumers (Households), and not stock indexes (Financial Markets).
   children:
     - id: orders_inventories
       name: Orders & Inventories
@@ -479,7 +479,7 @@
 
 - id: fiscal
   name: Government Finance
-  description: Government revenue, spending, deficits and debt, federal or state and local.
+  description: Government revenue, spending, deficits and debt, federal or state and local. Not government consumption and investment as a GDP component (Output & Growth), not social benefits counted as personal income (Households), and not the Fed's balance sheet, remittances or the Treasury General Account (Interest Rates & Monetary Policy).
   children:
     - id: budget
       name: Receipts, Outlays & Deficit
@@ -500,17 +500,17 @@
 
 - id: finance
   name: Banking & Credit
-  description: Banks and other financial intermediaries, the credit they extend and its quality, lending standards, and economy-wide debt.
+  description: Banks and other financial intermediaries, the securities they hold (including Treasury, agency and mortgage-backed securities at commercial banks), the credit they extend and its quality (delinquencies, charge-offs and foreclosures, including real estate foreclosures), lending standards, and economy-wide debt. Not the Federal Reserve's balance sheet, reserves or money-supply components such as deposits and retail money funds (Interest Rates & Monetary Policy), household debt and consumer credit totals (Households), residential mortgage debt and originations (Housing), or financial conditions indexes (Financial Markets).
   children:
     - id: banks
       name: Bank Balance Sheets
-      description: Commercial bank assets, liabilities, deposits, bank credit, securities and cash (H.8), and FDIC aggregates such as net interest income and number of institutions, plus bank failures.
+      description: Commercial bank assets, liabilities, deposits, bank credit, securities (including Treasury, agency and mortgage-backed securities held by banks) and cash (H.8, FDIC Quarterly Banking Profile), and FDIC aggregates such as net interest income and number of institutions, plus bank failures.
     - id: loans
       name: Bank Loans
       description: Loans and leases at commercial banks by type; commercial and industrial (C&I), consumer, credit card, auto, real estate (residential, commercial, home equity), and loans to nondepository institutions.
     - id: credit_quality
       name: Delinquencies & Charge-Offs
-      description: Delinquency, charge-off, past-due and noncurrent rates on loans (credit card, mortgage, commercial real estate, business, consumer, agricultural), foreclosures, and nonperforming loans.
+      description: Delinquency, charge-off, past-due and noncurrent rates on loans (credit card, mortgage, commercial real estate, business, consumer, agricultural), foreclosures (including nonfarm real estate foreclosures), and nonperforming loans.
     - id: lending_standards
       name: Lending Standards
       description: Senior Loan Officer Survey (SLOOS) net percentages of banks tightening standards or reporting stronger loan demand for C&I, CRE, credit card or auto loans.
@@ -523,11 +523,11 @@
 
 - id: markets
   name: Financial Markets & Conditions
-  description: Asset prices, volatility and aggregate measures of financial stress; stocks, bonds, crypto and commercial real estate.
+  description: Asset prices, volatility and aggregate measures of financial stress; stocks (including the Dow Jones Transportation Average and gold-miner indexes), bonds, crypto and commercial real estate, and financial conditions indexes and their subindexes (NFCI leverage, credit, risk). Not the Fed's securities holdings (Interest Rates & Monetary Policy).
   children:
     - id: equities
       name: Equities
-      description: Stock market indexes and valuations, and the size of the stock market.
+      description: Stock market indexes (including sector and gold-miner indexes) and valuations, and the size of the stock market.
       children:
         - id: indexes
           name: Stock Indexes
