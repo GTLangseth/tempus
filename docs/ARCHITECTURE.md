@@ -30,42 +30,53 @@ and the quarterly review procedure live in [`STACK.md`](STACK.md).
 | Sources | ✅ FRED | `src/tempus/sources/` | One adapter per provider behind the `Source` protocol (`fetch_meta`, `fetch_observations`) |
 | Sync engine | ✅ built | `src/tempus/sync.py` | Reconciles a source's series into the database and logs each attempt to `sync_runs` |
 | Catalog | ✅ built | `catalog.toml` | Declarative, git-tracked list of the series to keep synced |
-| Ontology | ✅ built | `ontology/concepts.yaml`, `src/tempus/ontology.py` | Git-tracked concept tree of *what is measured*; mirrored into the `concepts` table |
-| Filing | ✅ built | `src/tempus/filing.py`, `src/tempus/jev.py` | Places series in the tree by walking it top-down with TypeSafe's Jev; pins in `catalog.toml` override |
-| CLI | ✅ built | `src/tempus/cli.py` | `tempus` commands for data actions: sync, catalog, inspect, search |
+| Snapshot import | ✅ built | `data/fred/series-snapshot.json`, `src/tempus/snapshot.py` | `tempus catalog import-snapshot`: metadata for ~2,000 popular FRED series into `series`, no observations, so the tree has something to browse before anything is synced |
+| Ontology | ✅ built | `ontology/concepts.yaml`, `src/tempus/ontology.py` | Git-tracked concept tree of *what is measured* (174 concepts, 3–4 levels); mirrored into the `concepts` table |
+| Draft placements | 🟡 temporary | `ontology/placements.draft.yaml` | Claude-written homes for the snapshot series, loaded as method `draft`; replaced by Jev filing (see Decisions) |
+| Filing | ✅ built | `src/tempus/filing.py`, `src/tempus/jev.py` | Places series in the tree by walking it top-down with TypeSafe's Jev; pins in `catalog.toml` override; drafts are re-decided |
+| Navigation | ✅ built | `src/tempus/navigate.py` | Phrase → concepts → series by beam search down the tree (Jev, or a labeled lexical fallback with no key): `/api/navigate`, `tempus resolve` |
+| CLI | ✅ built | `src/tempus/cli.py` | `tempus` commands for data actions: sync, catalog, inspect, search, resolve |
 | Repo tooling | ✅ built | `mise.toml` | Pins tools (Python, uv, Node) and runs repo tasks (setup, db, test, lint) |
 | Home base | 🟡 runbook ready | `docs/HOMEBASE.md`, `scripts/homebase/` | Mac mini on Tailscale: real DB and keys, `tempus serve` under launchd published with `tailscale serve`, SSH + tmux for agents from the phone (`mise run homebase:setup`) |
 | Scheduler | 🟡 minimal | `tempus sync --every 6h` | A blocking loop for now; see open questions |
 | Cards | ✅ built | `cards/`, `src/tempus/cards/` | Card language v1 (inputs, formulas, panels), static checks, Polars engine, panel payloads |
-| App | ✅ built | `src/tempus/app.py`, `src/tempus/web/` | `tempus serve`: FastAPI engine API + no-build static front end (ECharts), hot reload |
-| Web front end | 🟡 cards view built; explore view is SPA-23 | see App | The App row above serves it; no separate Next.js app |
+| App | ✅ built | `src/tempus/app.py`, `src/tempus/explore.py`, `src/tempus/web/` | `tempus serve`: FastAPI engine API + no-build static front end (ECharts, three.js), hot reload |
+| Web front end | ✅ explore, series and cards views | see App | Explore (default): the concept tree in 3D with natural-language search, or an outline on small screens. Series pages: an implicit single-series card. Cards: saved cards, hot-reloaded |
 
 ## Data flow
 
 ```
 catalog.toml ──▶ tempus sync ──▶ Source adapter ──HTTP──▶ provider API (FRED, …)
-                     │
+                     │                       ▲
+data/fred/series-snapshot.json               │ sync on first open of a series page (FRED_API_KEY)
+  ──▶ tempus catalog import-snapshot (metadata only)
                      ▼
      TimescaleDB: series · observations (hypertable) · sync_runs
-                     ▲    concepts · series_concepts
+                     ▲    concepts · series_concepts (manual > auto > draft)
                      │
-ontology/concepts.yaml ──▶ tempus ontology file ──▶ Jev (TypeSafe API)
+ontology/concepts.yaml ─────┐
+ontology/placements.draft.yaml ──▶ tempus ontology load
+                            └──▶ tempus ontology file ──▶ Jev (TypeSafe API)
                      │
                      ▼
 cards/*.yaml ──▶ card engine (check · resolve · evaluate · render) ──▶ panel payloads ──▶ tempus serve ──▶ browser
+                                                                        /api/explore · /api/navigate · /api/series
 ```
 
 ## Data model
 
 - **`series`** has one row per `(source, series_id)`: metadata, plus `upstream_updated_at`
-  (when the provider last revised the series) and `last_synced_at`.
+  (when the provider last revised the series) and `last_synced_at`. Rows from the snapshot
+  import have both NULL and no observations until synced; the snapshot's own fields
+  (popularity, coverage, short codes, its `last_updated`) sit in `extra`.
 - **`observations`** maps `(source, series_id, ts)` to `value`. It's a hypertable on `ts`.
   `value` is NULL where the provider reports a missing point.
 - **`sync_runs`** is an append-only log of sync attempts and their outcomes.
 - **`concepts`** mirrors the YAML tree. Its `id` is the dotted path (`labor.unemployment`).
-- **`series_concepts`** holds one placement per series: `manual` (a pin) or `auto` (with the
-  lowest probability along the path, plus a trail of each level's decision). A NULL concept
-  means nothing fit at the top level.
+- **`series_concepts`** holds one placement per series: `manual` (a pin), `auto` (with the
+  lowest probability along the path, plus a trail of each level's decision) or `draft` (from
+  `ontology/placements.draft.yaml`; the trail records `low` when it was a judgment call).
+  Precedence is manual > auto > draft. A NULL concept means nothing fit at the top level.
 - **`cards`** is an index of `cards/*.yaml` (the files are the source of truth): id, title,
   question, tags, concepts, the parsed spec as `jsonb`, and a file hash. Rebuilt by
   `tempus card load`.
@@ -123,7 +134,7 @@ By the horizon in [`SOUL.md`](SOUL.md) where it first matters. Status: ✅ built
 | **Ontology upkeep:** Claude proposes a branch; Jev checks it's needed and distinct from its siblings. When the tree changes, re-ask only the series placed near the changed branch | yes/no, choice | Explore | ⬜ | Completes the Jevbox pattern without trusting generated branches blindly |
 | **Ranking for deep dives:** score FRED search results by "is this the headline series for this concept?" | score | Explore | ⬜ | Turns hundreds of search hits into a short list worth adding |
 | **Series labels:** how each series is measured (level, % change, rate, index), real vs. nominal, geography | choice | Explore → Cards | ⬜ | Cards need these to transform safely, e.g. no YoY change of a series that's already a YoY change. Recorded once per series |
-| **Resolving phrases to series IDs:** "crude" → `prices.commodities.energy` → `DCOILWTICO` | choice per level (beam search) | Cards → Converse | ⬜ | Removes invented series IDs, the most likely failure when an LLM drafts a card. Every reference exists and has a probability |
+| **Resolving phrases to series IDs:** "crude" → `prices.commodities.energy` → `DCOILWTICO` | choice per level (beam search) | Explore → Converse | ✅ | Removes invented series IDs, the most likely failure when an LLM drafts a card. Every reference exists and has a probability. Powers the explore search and `tempus resolve`; decisions aren't recorded yet (SPA-16) |
 | **Choosing the card operation:** question → compare, lead-lag, ratio, rebase, forecast, find precedents | choice | Cards → Converse | ⬜ | Constrains Claude to the card vocabulary; it fills in the slots for one operation |
 | **Checking cards before they run:** does it answer the question? is the transform valid for these units? are the series comparable? | yes/no | Cards | ⬜ | Semantic validation next to schema validation; cheap enough for every draft |
 | **Picking saved cards for a question:** rank the card library for a question | score | Converse | ⬜ | Jevbox's search, applied to cards instead of documents |
@@ -152,6 +163,45 @@ Newest first. Each entry: what we chose, and why.
   database through an SSH tunnel. Cloud routines keep doing code-only work. `tailscaled` runs
   as a system daemon, so it's up before login, and Colima replaces Docker Desktop there.
   Runbook: `docs/HOMEBASE.md`.
+- **2026-10-04 · Draft placements: a temporary, user-approved exception to "Jev decides".**
+  To make the explore view useful before any Jev filing has run, a Claude session placed
+  all 1,965 snapshot series in the tree by hand-reviewed rules, in batches, with 29 judgment
+  calls flagged `low`. They live in git as `ontology/placements.draft.yaml` (versioned,
+  concept → `source:series_id` refs) and load as method `draft`. Drafts never outrank a pin
+  or a Jev decision, `tempus ontology file` treats them as unfiled, and a draft dropped from
+  the file is deleted on the next load. **How they get replaced:** run `tempus ontology
+  file` (with `TYPESAFE_API_KEY`); each draft becomes an `auto` placement with real
+  probabilities, or a pin where a person overrides. Once no `draft` rows remain, delete the
+  file. Until then the UI labels every draft as such. `schema.sql` widens the `method`
+  check constraint with an idempotent drop-and-re-add, so existing databases upgrade on
+  `tempus db init`.
+- **2026-10-04 · The ontology covers a FRED metadata snapshot, not only synced series**
+  (supersedes "organizes only synced series" below). `tempus catalog import-snapshot` loads
+  metadata for ~2,000 popular US series into `series` without observations; `catalog.toml`
+  stays the list `sync` keeps fresh. Series pages sync one on first open when
+  `FRED_API_KEY` is set. The tree grew to 174 concepts with three new top-level areas
+  (Banking & Credit, Business Cycle & Outlook, Population & Society). Exchange rates split
+  into advanced and emerging currencies: a grouping of *what is priced*, not a geography
+  facet, but close to the line, so revisit if it starts to sprawl.
+- **2026-10-04 · Explore is a 3D tree with a deterministic layout, in plain three.js.**
+  Concepts sit on nested spherical caps by depth and each concept's series form a seed head
+  beyond it ("dandelion"). No force simulation: the same tree always lands in the same place,
+  so camera flights and screenshots are stable, and ~2,000 seeds render as instanced meshes.
+  three.js is loaded from a pinned CDN through an import map (no build step), only by the 3D
+  view; an outline view covers small screens and missing WebGL. See `STACK.md` for the
+  alternatives (3d-force-graph, deck.gl, a 2D radial tree).
+- **2026-10-04 · Natural-language navigation is a beam search down the tree.** At each level
+  the chooser picks among the children plus "none of these"; up to four routes survive,
+  ranked by the geometric mean of their decision probabilities (single-child steps don't
+  count, a child must reach 0.2 and beat "none of these"). The series under each reached
+  concept are then ranked per route. With `TYPESAFE_API_KEY` the chooser is Jev (still
+  `jev-latest`; pinning is SPA-15); without one, or if Jev fails, a BM25 lexical chooser
+  stands in and every response names which one answered. Decisions aren't recorded yet
+  (SPA-16).
+- **2026-10-04 · A series page is an implicit card.** `/api/series/{source}/{id}` builds a
+  stat-plus-timeseries card in memory and runs it through the card engine (`run_spec`), so
+  series pages and saved cards share payloads and adapters, and nothing is written to
+  `cards/`.
 
 - **2026-10-04 · Cards are evaluated in a Python engine; the web app reads through it.**
   This reverses "the web app reads TimescaleDB directly": cards are the shared logic that
@@ -189,7 +239,8 @@ Newest first. Each entry: what we chose, and why.
   branch: "index" describes how a series is measured, not what it measures, so broad
   indexes stay at `prices.commodities` (a facet, consistent with the decision below).
 
-- **2026-10-04 · The ontology organizes only synced series for now.** It started with the
+- **2026-10-04 · The ontology organizes only synced series for now (superseded the same day
+  by the snapshot decision above).** It started with the
   series in `catalog.toml`, then deepened by branch. Indexing FRED-wide metadata for
   discovery is deferred: it costs many API calls and filing money at that scale.
 - **2026-10-04 · Jevbox-style filing with Jev.** The walk goes top-down, one choice per level
@@ -236,6 +287,10 @@ Newest first. Each entry: what we chose, and why.
   to a recent window instead of the whole series. Open: how freshness is detected without
   a `last_updated` stamp, and how non-additive metrics are cached. See `STACK.md` → Two
   domains.
+
+- **Retiring drafts:** after `tempus ontology file` has run, should drafts that Jev left at a
+  shallower concept (below threshold) keep any influence, e.g. as a hint shown in review?
+  Today Jev's answer simply replaces the draft.
 
 - **Cross-links:** some series belong to two concepts (real consumer spending is both a
   GDP component and household spending; mortgage rates are both rates and housing). Add

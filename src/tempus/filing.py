@@ -80,7 +80,8 @@ def series_state(row: dict) -> dict:
 def file_series(
     conn: psycopg.Connection, roots: list[Concept], jev: Chooser, *, refile: bool = False
 ):
-    """File every synced series that has no placement (or every auto placement if `refile`).
+    """File every series that has no placement or only a draft one (and, with `refile`, every
+    auto placement too).
 
     Yields (source, series_id, Placement) as each one is decided. Manual pins are never touched.
     """
@@ -88,7 +89,7 @@ def file_series(
         """
         SELECT s.* FROM series s
         LEFT JOIN series_concepts sc USING (source, series_id)
-        WHERE sc.series_id IS NULL OR (%s AND sc.method = 'auto')
+        WHERE sc.series_id IS NULL OR sc.method = 'draft' OR (%s AND sc.method = 'auto')
         ORDER BY s.source, s.series_id
         """,
         (refile,),

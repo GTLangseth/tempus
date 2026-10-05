@@ -7,7 +7,7 @@ import json
 from datetime import date
 from pathlib import Path
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Query
 from fastapi.responses import StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from watchfiles import awatch
@@ -17,13 +17,19 @@ from tempus.cards.check import check_card
 from tempus.cards.errors import has_errors
 from tempus.cards.repository import FileCardRepository
 from tempus.cards.run import run_card
+from tempus.cards.spec import CARD_ID
 from tempus.config import Settings, get_settings
+from tempus.explore import SourceFactory, catalog_from_db, explore_payload, series_page
+from tempus.jev import JevClient, JevError
+from tempus.navigate import LexicalChooser, navigate
+from tempus.sources import SOURCE_NAMES, get_source
 
 WEB_DIR = Path(__file__).with_name("web")
 
 
 def card_event(repo: FileCardRepository, path: Path) -> dict | None:
-    if path.suffix != ".yaml":
+    # Editors' temp and backup files (.#card.yaml, card.tmp.yaml) aren't cards.
+    if path.suffix != ".yaml" or not CARD_ID.fullmatch(path.stem):
         return None
     card_id = path.stem
     if not path.exists():
@@ -36,8 +42,21 @@ def card_event(repo: FileCardRepository, path: Path) -> dict | None:
     return {"event": "card-changed", "card": card_id}
 
 
-def create_app(settings: Settings | None = None) -> FastAPI:
+LEXICAL = "lexical fallback (no TYPESAFE_API_KEY)"
+
+
+def default_sync_source(settings: Settings) -> SourceFactory | None:
+    """Sync-on-open needs a provider key; without one, series pages explain how to sync."""
+    if not settings.fred_api_key:
+        return None
+    return lambda name: get_source(name, settings) if name in SOURCE_NAMES else None
+
+
+def create_app(
+    settings: Settings | None = None, sync_source: SourceFactory | None = None
+) -> FastAPI:
     settings = settings or get_settings()
+    sync_source = sync_source or default_sync_source(settings)
     repo = FileCardRepository(settings.cards_path)
     app = FastAPI(title="tempus")
 
@@ -97,6 +116,37 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             (nodes[r["parent_id"]]["children"] if r["parent_id"] else tree).append(nodes[r["id"]])
         unfiled = [c["id"] for c in cards if not any(k in nodes for k in c["concepts"])]
         return {"tree": tree, "unfiled_cards": unfiled}
+
+    @app.get("/api/explore")
+    def explore() -> dict:
+        with db.connect(settings.database_url) as conn:
+            return explore_payload(conn)
+
+    @app.get("/api/navigate")
+    def navigate_route(q: str = Query(..., max_length=300)) -> dict:
+        query = q.strip()
+        if not query:
+            raise HTTPException(422, "say what you're looking for")
+        with db.connect(settings.database_url) as conn:
+            catalog = catalog_from_db(conn)
+        if settings.typesafe_api_key:
+            try:
+                jev = JevClient(settings.typesafe_api_key)
+                return navigate(query, catalog, jev, label="jev").to_dict(catalog)
+            except JevError as exc:
+                label = f"lexical fallback (Jev failed: {str(exc)[:120]})"
+                return navigate(query, catalog, LexicalChooser(catalog), label=label).to_dict(
+                    catalog
+                )
+        return navigate(query, catalog, LexicalChooser(catalog), label=LEXICAL).to_dict(catalog)
+
+    @app.get("/api/series/{source}/{series_id}")
+    def series_route(source: str, series_id: str) -> dict:
+        with db.connect(settings.database_url) as conn:
+            page = series_page(conn, source, series_id, sync_source)
+        if page is None:
+            raise HTTPException(404, f"no series {source}:{series_id}")
+        return page
 
     @app.get("/api/events")
     async def events() -> StreamingResponse:

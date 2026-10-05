@@ -1,191 +1,589 @@
 # The tempus concept tree: WHAT a series measures.
 #
 # Geography, frequency, seasonal adjustment and units are facets on each series, not levels
-# here. A concept's full ID is its dotted path (e.g. `labor.unemployment`). Descriptions are
-# shown to the filing model as the menu at each level, so make them say what belongs here
-# and how it differs from its siblings.
+# here: "Unemployment Rate in Texas" lives at labor.unemployment.rate next to UNRATE, and an
+# average retail price sits next to the price index for the same item. A concept's full ID
+# is its dotted path (e.g. `labor.unemployment`). Descriptions are shown to the filing model
+# (and the `navigate` search) as the menu at each level, so make them say what belongs here
+# and how it differs from its siblings, and name the well-known series and acronyms.
 #
 # Edit freely, then run `tempus ontology load`. Removing a concept un-files its series,
-# which `tempus ontology file` will then place again.
+# which `tempus ontology file` will then place again. Draft placements for the FRED
+# snapshot live in ontology/placements.draft.yaml.
 
 - id: output
   name: Output & Growth
-  description: Size and growth of the whole economy and its production. GDP and its expenditure components, industrial production, capacity utilization, productivity.
+  description: Size and growth of the whole economy and its production. GDP and GDI, the expenditure components of GDP other than consumer spending, industrial production, capacity utilization, productivity and energy use.
   children:
     - id: gdp
       name: Gross Domestic Product
-      description: Total GDP or GNP, nominal or real, and the GDP price deflator.
+      description: Total output of the economy, nominal or real, levels or growth rates, for the nation, a state or a county; GDP per capita, potential GDP, and the income side (GDI, national income, national saving).
+      children:
+        - id: total
+          name: GDP & GNP
+          description: Headline gross domestic product or gross national product, nominal or real (chained dollars), as a level or a growth rate, nationally or for a state, metro or county; also GDP per capita.
+        - id: potential
+          name: Potential Output
+          description: Estimates of potential GDP (real or nominal) from the CBO, used to measure the output gap.
+        - id: income_side
+          name: Income Side & National Saving
+          description: Gross domestic income (GDI), national income, net national product, the average of GDP and GDI, and gross or net national saving.
     - id: gdp_components
       name: GDP Components
-      description: Expenditure components of GDP. Personal consumption, private investment, government spending, net exports, inventories.
+      description: Expenditure components of GDP other than personal consumption (which is under Households › Spending). Private investment (residential, nonresidential, equipment, software, structures), inventory change, government consumption and investment, and contributions to or shares of GDP growth.
+      children:
+        - id: investment
+          name: Private Investment
+          description: Gross private domestic investment and fixed investment, residential or nonresidential, equipment, information processing and software, structures, the change in private inventories, and gross fixed capital formation.
+        - id: government
+          name: Government Consumption & Investment
+          description: Government consumption expenditures and gross investment as a GDP component (federal, defense, state and local), real or nominal, or as a share of GDP. Not budget outlays.
+        - id: contributions
+          name: Contributions & Shares
+          description: Contributions of each component or industry to real GDP growth (percentage points), and component shares of GDP or of GDI.
     - id: industrial_production
       name: Industrial Production & Capacity
-      description: Output of manufacturing, mining and utilities, and capacity utilization.
+      description: Output of manufacturing, mining and utilities, capacity utilization, motor vehicle production, and gross output or value added by industry.
+      children:
+        - id: production
+          name: Industrial Production Indexes
+          description: The Fed's industrial production index (INDPRO) in total or for manufacturing, mining, utilities or a specific industry (motor vehicles, semiconductors, machinery, chemicals, steel), plus unit counts of domestic auto production and assemblies.
+        - id: capacity
+          name: Capacity Utilization
+          description: Capacity utilization rates (TCU) for total industry, manufacturing or a specific industry.
+        - id: by_industry
+          name: Output by Industry
+          description: Gross output, real value added or real GDP of an industry (e.g. manufacturing) from the BEA industry accounts, including value added as a percentage of GDP.
     - id: productivity
       name: Productivity & Costs
-      description: Output per hour, unit labor costs, total factor productivity.
+      description: Output per hour, unit labor costs, labor share, hours worked in the business sector, total factor productivity and capital stock.
+      children:
+        - id: labor_productivity
+          name: Labor Productivity & Hours
+          description: Output per hour (labor productivity) and hours worked for the nonfarm business, business or manufacturing sector, and real sectoral output.
+        - id: labor_costs
+          name: Unit Labor Costs & Labor Share
+          description: Unit labor costs, real hourly compensation, and the labor share (labor compensation as a share of output or GDP).
+        - id: tfp
+          name: Total Factor Productivity & Capital
+          description: Total factor productivity (multifactor productivity) and capital stock at constant prices.
+    - id: energy
+      name: Energy Use & Emissions
+      description: Physical consumption of energy (e.g. natural gas consumption in cubic feet) and carbon dioxide emissions. Not energy prices.
 
 - id: labor
   name: Labor Market
-  description: Jobs, workers and pay. Unemployment, employment, participation, wages, layoffs and hiring.
+  description: Jobs, workers and pay. Unemployment, employment and payrolls, participation, wages and earnings, hours, jobless claims, job openings and turnover, and job postings.
   children:
     - id: unemployment
       name: Unemployment
-      description: Unemployment rates and counts of unemployed people, including alternative measures (U-6) and duration of unemployment.
+      description: Unemployment rates and counts of unemployed people, nationally, by state or by demographic group, including alternative measures (U-1 to U-6) and duration of unemployment.
+      children:
+        - id: rate
+          name: Unemployment Rate
+          description: The official unemployment rate (U-3, UNRATE) for the nation, a state, county or metro area, or a demographic group (age, sex, race, education, nativity, industry); the natural or noncyclical rate (NROU); youth unemployment.
+        - id: alternative
+          name: Alternative Measures (U-1 to U-6)
+          description: Broader and narrower measures of labor underutilization, U-1, U-2, U-4, U-5 and U-6 (unemployed plus marginally attached and part time for economic reasons).
+        - id: duration
+          name: Duration of Unemployment
+          description: Mean or median weeks unemployed, the number unemployed by duration (less than 5 weeks, 15+ weeks, 27+ weeks), and the long-term unemployed share.
+        - id: level
+          name: Number Unemployed
+          description: Counts of unemployed people (thousands), including job losers on layoff and permanent job losers, and labor force flows from unemployed to employed.
     - id: employment
       name: Employment & Payrolls
-      description: Number of people employed or jobs on payrolls (nonfarm payrolls, household employment), by industry or in total.
+      description: Number of people employed or jobs on payrolls (nonfarm payrolls, household employment), by industry, state or in total.
+      children:
+        - id: payrolls
+          name: Nonfarm Payrolls
+          description: Establishment-survey jobs (all employees, thousands) in total nonfarm (PAYEMS), total private, government or a specific industry (manufacturing, construction, health care, retail, leisure, temporary help), nationally or by state; ADP private payrolls.
+        - id: household
+          name: Household Survey Employment
+          description: Employment level from the household survey (CE16OV), full-time or part-time workers, part time for economic reasons, multiple jobholders, employment by nativity or occupation.
     - id: participation
-      name: Participation
-      description: Labor force participation and employment-population ratios, and the size of the labor force.
+      name: Participation & Labor Force
+      description: Labor force participation and employment-population ratios, the size of the civilian labor force, people not in the labor force, and the working-age population.
+      children:
+        - id: rate
+          name: Participation Rate
+          description: Labor force participation rate (CIVPART) overall or by age, sex, race, education, disability, nativity or state; including prime-age (25-54) participation.
+        - id: employment_ratio
+          name: Employment-Population Ratio
+          description: The employment-population ratio (EMRATIO), overall or for prime-age (25-54) workers, and OECD employment rates for ages 15-64.
+        - id: labor_force
+          name: Labor Force & Population Levels
+          description: Civilian labor force level, civilian noninstitutional population (16+, by age or nativity), working-age population, and people not in the labor force, including those who want a job, marginally attached and discouraged workers.
     - id: wages
       name: Wages & Compensation
-      description: Hourly or weekly earnings, the employment cost index, compensation of employees.
+      description: Hourly or weekly earnings, wage growth trackers, the employment cost index, compensation of employees and aggregate payrolls, and minimum wages.
+      children:
+        - id: earnings
+          name: Earnings & Wage Growth
+          description: Average hourly or weekly earnings (all employees or production and nonsupervisory, by industry or state), median usual weekly earnings, real earnings, and the Atlanta Fed wage growth tracker.
+        - id: eci
+          name: Employment Cost Index
+          description: The employment cost index (ECI) for total compensation or wages and salaries, all civilian or private industry, by industry.
+        - id: compensation
+          name: Compensation & Aggregate Payrolls
+          description: Aggregate compensation of employees, wage and salary disbursements, total wages and salaries, and indexes of aggregate weekly payrolls; labor compensation shares of income.
+        - id: minimum_wage
+          name: Minimum Wage
+          description: Federal or state minimum hourly wage rates, and the share of workers paid at or below the minimum wage.
+    - id: hours
+      name: Hours Worked
+      description: Average weekly hours and overtime hours of employees (total private or manufacturing), average annual hours worked per person, aggregate hours, and work-from-home rates.
     - id: claims
       name: Jobless Claims
-      description: Initial and continuing claims for unemployment insurance.
+      description: Initial and continuing claims for unemployment insurance (ICSA, CCSA), their 4-week moving averages, the insured unemployment rate, and state claims.
     - id: turnover
       name: Openings & Turnover
-      description: Job openings, hires, quits and layoffs (JOLTS).
+      description: Job openings, hires, quits, layoffs and discharges, and other separations from JOLTS, as levels or rates, in total or by industry.
+    - id: postings
+      name: Job Postings
+      description: Online job postings indexes from Indeed, in total, new postings, or by occupation (software development, nursing, construction, banking), in the US or other countries.
 
 - id: prices
   name: Prices & Inflation
-  description: How fast prices are changing. Consumer and producer prices, inflation expectations, commodity prices.
+  description: How fast prices are changing. Consumer prices (CPI, PCE), producer prices (PPI), import and export prices, economy-wide deflators, inflation expectations and commodity prices.
   children:
     - id: consumer
       name: Consumer Prices
-      description: CPI and PCE price indexes, headline or core, their components, and average retail prices of specific items.
+      description: CPI and PCE price indexes, headline or core, their components, underlying-inflation measures, and average retail prices of specific items.
       children:
         - id: headline
           name: Headline
-          description: Price index for all items in the consumer basket (all-items CPI, headline PCE price index).
+          description: Price index for all items in the consumer basket (all-items CPI, headline PCE price index, chained CPI, CPI-W), nationally or for a region or metro area, as an index or an inflation rate; purchasing power of the dollar.
         - id: core
           name: Core
-          description: Price index for all items excluding food and energy (core CPI, core PCE).
+          description: Price index for all items excluding food and energy (core CPI, core PCE), as an index or an inflation rate.
+        - id: underlying
+          name: Underlying Inflation Measures
+          description: Alternative trend-inflation measures from regional Feds; trimmed-mean and median CPI (Cleveland Fed), trimmed-mean PCE (Dallas Fed), and sticky-price CPI (Atlanta Fed).
         - id: food
           name: Food & Beverages
-          description: Consumer prices of food and beverages, in total, at home or away from home, or for a specific item (e.g. coffee, eggs), as an index or an average retail price.
+          description: Consumer prices of food and beverages, in total, at home or away from home, or for a specific item (e.g. coffee, eggs, beef, milk, bread), as an index or an average retail price; also PCE spending prices for food.
         - id: energy
           name: Energy
-          description: Consumer prices of energy, in total or for a specific item such as gasoline, fuel oil, electricity or utility gas.
+          description: Consumer prices of energy, in total or for a specific item such as gasoline, diesel, fuel oil, electricity or utility (piped) gas, as an index, an average retail price or a weekly pump price.
+        - id: shelter
+          name: Shelter & Housing
+          description: CPI for shelter, rent of primary residence, owners' equivalent rent, and the overall housing CPI.
+        - id: goods
+          name: Goods
+          description: Consumer prices of goods excluding food and energy; durables, apparel, computers and IT hardware, core goods (commodities less food and energy), and the PCE goods price index.
+        - id: transportation
+          name: Vehicles & Transportation
+          description: CPI for transportation, new and used cars and trucks, motor vehicle parts, maintenance and repair, and airline fares.
+        - id: services
+          name: Services
+          description: Consumer prices of services; services less energy or less rent of shelter (supercore), medical care, hospitals, health care, tuition and childcare, admissions, water and trash, funeral services, and the PCE services price index.
     - id: producer
       name: Producer Prices
-      description: Producer price indexes for final demand, intermediate goods or specific industries.
+      description: Producer price indexes (PPI) for final demand, by commodity or by industry; materials (metals, chemicals, wood and paper, building materials), energy and fuels, farm and food, machinery and equipment, and business services.
+      children:
+        - id: final_demand
+          name: Final Demand & Aggregates
+          description: Broad PPIs; final demand, final demand less foods and energy, finished goods, all commodities (PPIACO), industrial commodities, and total manufacturing, mining or wholesale trade industries.
+        - id: metals
+          name: Metals
+          description: PPIs for metals and metal products; iron and steel, steel mill products, scrap, aluminum, copper, nickel, titanium, fabricated metal products, and gold ores.
+        - id: chemicals
+          name: Chemicals, Plastics & Rubber
+          description: PPIs for chemicals (basic organic and inorganic, industrial gases, fertilizers, pesticides, paints, ethanol), plastic resins and plastics products, synthetic rubber and tires, and pharmaceuticals.
+        - id: wood_paper
+          name: Lumber, Wood & Paper
+          description: PPIs for lumber (softwood, hardwood), plywood, wood products and pallets, wood pulp, paper, paperboard and packaging.
+        - id: building_materials
+          name: Construction Materials & Services
+          description: PPIs for construction materials (cement, ready-mix concrete, sand and gravel, gypsum, glass, insulation, asphalt), inputs to construction, and new building construction and contractor prices.
+        - id: energy
+          name: Fuels & Power
+          description: PPIs for crude petroleum, refined petroleum products, diesel, lubricants, petrochemicals, and electric power and utilities.
+        - id: farm_food
+          name: Farm Products & Food
+          description: PPIs for farm products (wheat, corn, cattle, nuts, produce), processed foods and feeds, hides, and food manufacturing.
+        - id: equipment
+          name: Machinery & Equipment
+          description: PPIs for machinery and equipment, electrical equipment and transformers, turbines, HVAC, semiconductors and electronic components, computers, aerospace and aircraft, motor vehicles, medical equipment, and capital equipment.
+        - id: services
+          name: Business Services & Transport
+          description: PPIs for services; trucking, rail and deep-sea freight, warehousing, legal and engineering services, hotels, insurance premiums, software publishing, data hosting, information, retail margins, repair, and waste collection.
+    - id: trade_prices
+      name: Import & Export Prices
+      description: Import and export price indexes (BLS end use or NAICS), in total, by product (e.g. gold, aluminum, semiconductors) or by country of origin, and international services prices such as air freight.
+    - id: deflators
+      name: GDP Deflators
+      description: Economy-wide price deflators; the GDP or GNP implicit price deflator and the GDP chain-type price index.
     - id: expectations
       name: Inflation Expectations
-      description: Survey-based or market-implied expected inflation, including breakeven inflation rates.
+      description: Survey-based, market-implied or model-based expected inflation, including breakeven inflation rates, forward inflation, inflation risk premia and price-pressure probabilities.
+      children:
+        - id: market
+          name: Market-Implied
+          description: Breakeven inflation rates from TIPS (5, 7, 10, 20, 30 years), the 5-year 5-year forward inflation expectation rate, and the inflation risk premium.
+        - id: survey_model
+          name: Surveys & Models
+          description: University of Michigan inflation expectations, Cleveland Fed model-based expected inflation by horizon, and the St. Louis Fed price pressures measure.
     - id: commodities
       name: Commodity Prices
       description: Wholesale spot or global benchmark prices of raw commodities (energy, agricultural, metals), not prices paid by consumers.
       children:
         - id: energy
           name: Energy Commodities
-          description: Benchmark prices of crude oil (WTI, Brent), natural gas (Henry Hub) and refined fuels.
+          description: Benchmark spot prices of crude oil (WTI, Brent), natural gas (Henry Hub) and natural gas liquids, and wholesale refined fuels (gasoline and diesel at New York Harbor or the Gulf Coast, jet fuel, heating oil, propane).
         - id: agriculture
           name: Agricultural Commodities
           description: Global prices of food and farm commodities such as coffee, cocoa, sugar, wheat, corn and beef.
         - id: metals
           name: Metals
-          description: Prices of industrial or precious metals such as copper, aluminum and nickel.
+          description: Prices of industrial or precious metals such as gold, silver, copper, aluminum and nickel.
         # Broad indexes spanning several of these groups (e.g. all commodities) stay at this level.
 
 - id: rates
   name: Interest Rates & Monetary Policy
-  description: The price of money and the stance of the central bank. Policy rates, Treasury yields, spreads, money supply and the Fed balance sheet.
+  description: The price of money and the stance of the central bank. Policy rates, money-market rates, Treasury yields, corporate bond yields, spreads, mortgage and consumer loan rates, money supply and the Fed balance sheet.
   children:
     - id: policy
       name: Policy Rates
-      description: The federal funds rate, its target range, and other overnight rates set or steered by the Fed (SOFR, IORB).
+      description: The federal funds rate, its target range, and other rates set or steered by the Fed (IORB, overnight reverse repo rate, discount rate, standing repo rate), plus policy-rate uncertainty.
+      children:
+        - id: fed_funds
+          name: Federal Funds Rate
+          description: The effective federal funds rate (EFFR, DFF, FEDFUNDS), its target range upper and lower limits, high values, and fed funds volume.
+        - id: administered
+          name: Administered Rates
+          description: Rates the Fed sets directly other than the fed funds target; interest on reserve balances (IORB), overnight reverse repo offering and award rates, the discount rate and primary credit rate, and the standing repo facility rate.
+    - id: money_markets
+      name: Money Market Rates
+      description: Short-term funding rates in private markets; repo rates (SOFR, TGCR), unsecured bank funding (OBFR, AMERIBOR, interbank rates), commercial paper rates and outstanding, the bank prime rate, and their volumes.
+      children:
+        - id: repo
+          name: Repo & SOFR
+          description: The Secured Overnight Financing Rate (SOFR), its averages, index and percentiles, the tri-party general collateral rate (TGCR), and their volumes.
+        - id: unsecured
+          name: Unsecured Bank Funding
+          description: The overnight bank funding rate (OBFR) and volume, AMERIBOR and its term rates, 3-month interbank and certificate of deposit rates, and the bank prime loan rate.
+        - id: commercial_paper
+          name: Commercial Paper
+          description: Commercial paper interest rates (financial, nonfinancial, asset-backed) and the amount of commercial paper outstanding.
     - id: treasury
       name: Treasury Yields
-      description: Yields on US Treasury bills, notes and bonds, nominal or inflation-indexed (TIPS), at a specific maturity.
+      description: Yields on US Treasury bills, notes and bonds, nominal or inflation-indexed (TIPS), at a specific maturity, plus fitted zero-coupon yields, forward rates and term premia.
+      children:
+        - id: bills
+          name: Bills & Short Maturities
+          description: Yields on Treasury bills and constant maturities of one year or less (4-week, 1-month, 3-month, 6-month, 1-year), secondary market or constant maturity.
+        - id: notes_bonds
+          name: Notes & Bonds
+          description: Nominal Treasury yields at 2 to 30 years constant maturity (DGS2, DGS10, DGS30), and long-term government bond yields.
+        - id: real
+          name: Real Yields & TIPS
+          description: Inflation-indexed Treasury yields (TIPS, DFII10), individual TIPS issues, the long-term inflation-indexed average, and model-based real interest rates.
+        - id: term_structure
+          name: Yield Curve Models & Term Premia
+          description: Fitted zero-coupon yields, instantaneous forward rates, and term premia on Treasuries (Kim-Wright, ACM style models).
+    - id: corporate
+      name: Corporate Bond Yields
+      description: Yields on corporate bonds; ICE BofA corporate and high-yield index effective yields and yields to worst by rating or maturity, Moody's Aaa and Baa seasoned yields, and the high quality market (HQM) corporate yield curve.
     - id: spreads
       name: Yield & Credit Spreads
-      description: Differences between two rates. Yield-curve spreads (10Y-2Y), corporate bond spreads, high-yield spreads.
+      description: Differences between two rates. Yield-curve spreads (10Y-2Y, 10Y-3M), Treasury or commercial paper minus fed funds, corporate bond and high-yield option-adjusted spreads, and Moody's corporate minus Treasury.
+      children:
+        - id: curve
+          name: Yield Curve Spreads
+          description: Spreads between Treasury maturities (10Y minus 2Y, 10Y minus 3M) and between Treasuries or commercial paper and the federal funds rate.
+        - id: credit
+          name: Credit Spreads
+          description: Option-adjusted spreads of corporate, high-yield and emerging-market bond indexes over Treasuries by rating or maturity, Moody's Aaa or Baa minus 10-year Treasury or fed funds, and mortgage credit spreads.
     - id: mortgage
       name: Mortgage Rates
-      description: Interest rates on home mortgages (e.g. 30-year fixed).
+      description: Interest rates on home mortgages (e.g. 30-year and 15-year fixed, conforming, jumbo, FHA, VA, USDA).
+    - id: retail
+      name: Loan & Deposit Rates
+      description: Interest rates banks charge consumers or pay depositors; credit card, auto loan and personal loan rates, finance company new car loan terms, and national savings, checking, money market and CD rates.
     - id: money
       name: Money & Fed Balance Sheet
-      description: Money supply (M1, M2), bank reserves, and Federal Reserve assets and liabilities.
+      description: Money supply (M1, M2), monetary base, velocity, bank reserves, and Federal Reserve assets and liabilities (H.4.1) and open market operations.
+      children:
+        - id: supply
+          name: Money Supply
+          description: Monetary aggregates and components (M1, M2, M3, real M1 and M2, currency, demand deposits, other liquid deposits, small time deposits, retail money market funds), the monetary base, and money velocity.
+        - id: fed_assets
+          name: Fed Assets
+          description: Federal Reserve total assets (WALCL) and securities held outright (Treasuries by maturity, mortgage-backed securities), loans and primary credit, central bank liquidity swaps, repos held, and gold.
+        - id: fed_liabilities
+          name: Reserves & Fed Liabilities
+          description: Reserve balances with Federal Reserve banks, total reserves and borrowings, the Treasury General Account, reverse repurchase agreements, currency in circulation, remittances to Treasury, and custody holdings for foreign accounts.
+        - id: operations
+          name: Open Market Operations
+          description: Daily amounts in the Fed's temporary open market operations; overnight repurchase and reverse repurchase agreements, securities submitted and accepted.
 
 - id: households
   name: Households & Consumers
-  description: Income, spending, saving, debt and sentiment of households.
+  description: Income, spending, saving, debt, wealth and sentiment of households.
   children:
     - id: income
       name: Income
-      description: Personal income and disposable personal income, nominal or real.
+      description: Personal income and disposable personal income, nominal or real, per capita, and household or family income and its distribution.
+      children:
+        - id: personal
+          name: Personal Income
+          description: Personal income and disposable personal income (DSPI) from the BEA, nominal or real, total or per capita, nationally or by state, and components such as Social Security benefits and personal interest.
+        - id: distribution
+          name: Household Income & Inequality
+          description: Median or mean household, family or personal income (Census), income by quintile or age, Gini coefficients, and poverty rates, nationally, by state or county.
     - id: spending
       name: Retail & Consumer Spending
-      description: Retail sales, vehicle sales and other direct measures of consumer purchases.
+      description: Personal consumption expenditures (PCE), retail sales, vehicle sales and other direct measures of consumer purchases.
+      children:
+        - id: pce
+          name: Personal Consumption Expenditures
+          description: Personal consumption expenditures (PCE) from the BEA, nominal or real, total or for goods, services, durables, nondurables, food or health care, and per capita, plus PCE nowcasts.
+        - id: retail_sales
+          name: Retail Sales
+          description: Monthly retail and food services sales (advance or final), in total or by store type (gasoline, grocery, clothing, restaurants), real retail sales, and e-commerce sales.
+        - id: vehicles
+          name: Vehicle Sales
+          description: Light vehicle and total vehicle sales (units, SAAR), autos and light or heavy trucks, and new car registrations.
+        - id: card_spending
+          name: Spending Surveys & Card Data
+          description: Consumer expenditure survey spending by age or income, and card-based spending momentum indexes (Visa).
     - id: saving_credit
       name: Saving & Credit
-      description: Personal saving rate, consumer credit, household debt and delinquencies.
+      description: Personal saving rate, consumer credit, household debt and debt service.
+      children:
+        - id: saving
+          name: Saving
+          description: Personal saving and the personal saving rate (PSAVERT), household saving, and gross private saving.
+        - id: consumer_credit
+          name: Consumer Credit
+          description: Total, revolving and student loan consumer credit (G.19), large-bank credit card balances and minimum payments, and household consumer credit liabilities.
+        - id: debt
+          name: Household Debt & Debt Service
+          description: Household debt levels and ratios; debt service and mortgage debt service as a share of disposable income, household debt to GDP, and household debt securities and loans.
+    - id: wealth
+      name: Wealth & Balance Sheets
+      description: Household net worth, total and financial assets, equity holdings and owners' equity in real estate (Z.1), and the distribution of wealth by percentile (top 1%, bottom 50%).
+      children:
+        - id: aggregate
+          name: Household Net Worth & Assets
+          description: Aggregate household and nonprofit net worth, total and financial assets, deposits, equities and mutual fund holdings, owners' equity in real estate, and US wealth.
+        - id: distribution
+          name: Wealth Distribution
+          description: Net worth, assets and shares held by wealth percentile groups (top 0.1%, top 1%, 90th-99th, 50th-90th, bottom 50%) and wealth cutoffs.
     - id: sentiment
       name: Consumer Sentiment
-      description: Survey measures of consumer confidence and sentiment.
+      description: Survey measures of consumer confidence and sentiment (University of Michigan, OECD consumer confidence).
 
 - id: housing
   name: Housing
-  description: Residential real estate activity and prices.
+  description: Residential real estate activity, prices, ownership and mortgage debt.
   children:
     - id: construction
       name: Starts & Permits
-      description: Housing starts, building permits, units under construction and completed.
+      description: Housing starts, building permits, units under construction and completed (single-family or 5+ units), new houses for sale by stage, and shipments of manufactured homes.
     - id: sales
       name: Home Sales & Inventory
-      description: New and existing home sales, months' supply, homes for sale.
+      description: New and existing home sales, months' supply, homes for sale, and listing inventory (active and new listings, days on market, home size).
+      children:
+        - id: existing
+          name: Existing Home Sales
+          description: Existing home and single-family home sales from NAR, their inventory and months' supply.
+        - id: new
+          name: New Home Sales
+          description: New one-family houses sold, new homes for sale, and the months' supply of new houses.
+        - id: listings
+          name: Listings & Market Speed
+          description: Realtor.com active listing counts, new listings, median days on market, and median home size, nationally, by state or metro.
     - id: home_prices
       name: Home Prices
-      description: House price indexes (Case-Shiller, FHFA) and median sales prices.
+      description: House price indexes (Case-Shiller, FHFA, Zillow, BIS), median and average sales or listing prices, condo prices, and housing affordability.
+      children:
+        - id: indexes
+          name: House Price Indexes
+          description: Repeat-sales and other house price indexes; S&P Case-Shiller national, composite or city indexes, FHFA all-transactions or purchase-only indexes, BIS residential property prices, condo price indexes, and the Zillow home value index.
+        - id: sale_prices
+          name: Sales & Listing Prices
+          description: Median or average sales prices of new or existing homes and manufactured homes, and median listing prices (total or per square foot), nationally, by region, state or metro.
+    - id: ownership
+      name: Ownership & Vacancy
+      description: Homeownership rates (overall, by age or race), homeowner and rental vacancy rates, and housing inventory estimates of occupied, renter-occupied and vacant units.
+    - id: mortgage_debt
+      name: Mortgage Debt & Lending
+      description: Residential mortgage debt outstanding, home equity lines, mortgage originations and loan-to-value, and mortgage applications.
 
 - id: business
   name: Business Activity
-  description: Firms' orders, inventories, profits and surveys of business conditions.
+  description: Firms' orders, inventories and sales, profits, balance sheets, surveys, new business formation, construction spending and freight and transportation activity.
   children:
     - id: orders_inventories
       name: Orders & Inventories
-      description: Durable goods orders, factory orders, business inventories and inventory-to-sales ratios.
+      description: Durable goods orders, factory orders and shipments, business inventories and sales, and inventory-to-sales ratios.
+      children:
+        - id: orders
+          name: New Orders & Shipments
+          description: Manufacturers' new orders (durable goods, capital goods, nondefense capital goods excluding aircraft, consumer goods, by industry) and shipments.
+        - id: inventories
+          name: Inventories & Sales
+          description: Business, manufacturers', wholesale and retail inventories, business and manufacturers' sales, real manufacturing and trade sales, and inventory-to-sales ratios.
     - id: surveys
       name: Business Surveys
-      description: Regional Fed manufacturing and services surveys, and other diffusion indexes of business conditions.
+      description: Regional Fed manufacturing and services surveys, other diffusion indexes of business conditions, OECD business confidence, and business expectations.
     - id: profits
-      name: Corporate Profits
-      description: Corporate profits and business income.
+      name: Corporate Profits & Finance
+      description: Corporate profits (with or without IVA and CCAdj, before or after tax), profits per unit of value added, corporate tax receipts share, and nonfinancial corporate balance sheets (debt, equity, net worth, cash, capital expenditures).
+    - id: formation
+      name: Business Formation & Innovation
+      description: New business applications (all or high-propensity) and patents granted.
+    - id: construction
+      name: Construction Spending
+      description: Value of construction put in place; total, residential, nonresidential, private or public, and by type (manufacturing, commercial, office, power, highway, health care, water).
+    - id: transportation
+      name: Freight & Transportation
+      description: Freight volumes and travel activity; Cass freight index, truck tonnage, rail carloads and intermodal traffic, the freight transportation services index, vehicle miles traveled, and air passengers, revenue passenger miles and load factor.
 
 - id: trade
   name: International Trade & Currencies
-  description: Flows of goods, services and capital across borders, and exchange rates.
+  description: Flows of goods, services and capital across borders, the balance of payments, and exchange rates.
   children:
     - id: balance
       name: Trade Balance
-      description: Exports, imports, the trade balance and the current account.
+      description: Exports, imports, the trade balance and net exports of goods and services, nominal or real, in total or with a partner country.
+      children:
+        - id: exports
+          name: Exports
+          description: Exports of goods and services or goods only, nominal or real, total or to a partner country (Canada, China), including nonmonetary gold.
+        - id: imports
+          name: Imports
+          description: Imports of goods and services or goods only, nominal or real, total or from a partner country (China, Mexico, Canada, Vietnam).
+        - id: net
+          name: Trade Balance & Net Exports
+          description: The goods and services trade balance (balance of payments basis) and net exports in the national accounts, nominal, real or as a share of GDP.
+    - id: payments
+      name: Current Account & Investment Position
+      description: The current account and capital account balances, the net international investment position, foreign direct investment, and official reserve assets.
     - id: fx
       name: Exchange Rates
-      description: Dollar exchange rates against single currencies or trade-weighted dollar indexes.
+      description: Dollar exchange rates against single currencies, or trade-weighted and effective dollar indexes.
+      children:
+        - id: dollar_indexes
+          name: Dollar Indexes
+          description: Trade-weighted dollar indexes (nominal or real broad, advanced foreign economies, emerging markets) and BIS effective exchange rates.
+        - id: advanced
+          name: Advanced-Economy Currencies
+          description: The dollar against currencies of advanced economies; euro, yen, pound, Canadian, Australian and New Zealand dollars, Swiss franc, Scandinavian kroner, Hong Kong and Singapore dollars, Taiwan dollar, Korean won.
+        - id: emerging
+          name: Emerging-Market Currencies
+          description: The dollar against emerging-market currencies; Chinese yuan, Indian rupee, Mexican peso, Brazilian real, South African rand, Malaysian ringgit, Thai baht, Indonesian rupiah and others.
 
 - id: fiscal
   name: Government Finance
-  description: Federal government revenue, spending, deficits and debt.
+  description: Government revenue, spending, deficits and debt, federal or state and local.
   children:
     - id: budget
       name: Receipts, Outlays & Deficit
-      description: Federal receipts, outlays and the surplus or deficit.
+      description: Federal receipts, outlays and the surplus or deficit, as levels or shares of GDP, and state tax collections and spending.
+      children:
+        - id: receipts
+          name: Receipts & Taxes
+          description: Federal receipts and tax receipts (personal income, corporate income, customs duties), state tax collections, and statutory tax rates.
+        - id: outlays
+          name: Outlays & Spending
+          description: Federal outlays and current expenditures, interest payments, defense, social programs (SNAP, welfare), subsidies, and state and local government expenditures.
+        - id: balance
+          name: Surplus or Deficit
+          description: The federal budget surplus or deficit, monthly or annual, in dollars or as a percentage of GDP.
     - id: debt
       name: Public Debt
-      description: Federal debt outstanding, held by the public or in total, including as a share of GDP.
+      description: Federal debt outstanding, held by the public, by the Fed, by foreign or private investors, or in total, at par or market value, including as a share of GDP; state and local government debt.
+
+- id: finance
+  name: Banking & Credit
+  description: Banks and other financial intermediaries, the credit they extend and its quality, lending standards, and economy-wide debt.
+  children:
+    - id: banks
+      name: Bank Balance Sheets
+      description: Commercial bank assets, liabilities, deposits, bank credit, securities and cash (H.8), and FDIC aggregates such as net interest income and number of institutions, plus bank failures.
+    - id: loans
+      name: Bank Loans
+      description: Loans and leases at commercial banks by type; commercial and industrial (C&I), consumer, credit card, auto, real estate (residential, commercial, home equity), and loans to nondepository institutions.
+    - id: credit_quality
+      name: Delinquencies & Charge-Offs
+      description: Delinquency, charge-off, past-due and noncurrent rates on loans (credit card, mortgage, commercial real estate, business, consumer, agricultural), foreclosures, and nonperforming loans.
+    - id: lending_standards
+      name: Lending Standards
+      description: Senior Loan Officer Survey (SLOOS) net percentages of banks tightening standards or reporting stronger loan demand for C&I, CRE, credit card or auto loans.
+    - id: nonbank
+      name: Funds & Nonbank Finance
+      description: Assets of money market funds, mutual funds, ETFs and pension funds, hedge fund borrowing, broker-dealer margin loans, and GSE advances.
+    - id: aggregate_debt
+      name: Economy-Wide Debt
+      description: Debt and credit across all sectors or the private nonfinancial sector; total debt securities and loans, credit to the private sector (BIS), debt to equity, and private debt securities to GDP.
 
 - id: markets
   name: Financial Markets & Conditions
-  description: Asset prices, volatility and aggregate measures of financial stress.
+  description: Asset prices, volatility and aggregate measures of financial stress; stocks, bonds, crypto and commercial real estate.
   children:
     - id: equities
       name: Equities
-      description: Stock market indexes and valuations.
+      description: Stock market indexes and valuations, and the size of the stock market.
+      children:
+        - id: indexes
+          name: Stock Indexes
+          description: Stock price indexes such as the S&P 500, Dow Jones averages, NASDAQ Composite and NASDAQ-100, sector indexes (semiconductors, gold and silver), total return variants, and OECD share prices.
+        - id: size
+          name: Market Size & Turnover
+          description: Stock market capitalization to GDP, value traded, turnover, number of listed companies, and the market value of corporate equities outstanding.
+    - id: bonds
+      name: Bond Indexes
+      description: Total return index values of corporate, high-yield and emerging-market bond indexes (ICE BofA).
     - id: volatility
       name: Volatility
-      description: Implied or realized volatility indexes (e.g. VIX).
+      description: Implied or realized volatility indexes (VIX, VXN, oil, gold, Russell 2000, emerging markets) and news-based equity market volatility trackers.
     - id: stress
       name: Financial Conditions & Stress
-      description: Composite financial conditions or stress indexes (e.g. NFCI, STLFSI).
+      description: Composite financial conditions or stress indexes (NFCI and its subindexes, STLFSI, Kansas City FSI) and risk-on/risk-off indexes.
+    - id: crypto
+      name: Crypto Assets
+      description: Prices of crypto assets such as Bitcoin and Ether.
+    - id: real_estate
+      name: Commercial Real Estate
+      description: Commercial and multifamily real estate price indexes.
+
+- id: cycle
+  name: Business Cycle & Outlook
+  description: Where the economy is in the cycle and where forecasters expect it to go. Recession indicators, composite activity and leading indexes, nowcasts, official projections and economic uncertainty.
+  children:
+    - id: recession
+      name: Recession Indicators
+      description: NBER recession dates as 0/1 indicators, the Sahm rule, smoothed recession probabilities, and GDP-based recession indicators.
+    - id: activity
+      name: Activity & Leading Indexes
+      description: Composite indexes of economic activity or leading indicators; Chicago Fed National Activity Index (CFNAI), Weekly Economic Index, coincident and leading indexes, OECD composite leading indicators, Brave-Butters-Kelley indexes, and labor market conditions indexes.
+    - id: nowcasts
+      name: Nowcasts
+      description: Real-time model estimates of current-quarter growth, such as Atlanta Fed GDPNow and St. Louis Fed economic news index.
+    - id: projections
+      name: FOMC Projections
+      description: FOMC Summary of Economic Projections for GDP growth, unemployment, PCE inflation and the fed funds rate (median, central tendency, longer run).
+    - id: uncertainty
+      name: Economic Uncertainty
+      description: Economic policy uncertainty and world uncertainty indexes built from news or reports.
+
+- id: population
+  name: Population & Society
+  description: How many people there are and how they live; population, households, births, life expectancy, education and internet use.
+  children:
+    - id: population
+      name: Population
+      description: Resident or total population, nationally, by state, county or metro, population growth, and the age structure (share aged 65+, dependency ratio).
+    - id: households
+      name: Households
+      description: Number of households and household estimates.
+    - id: vital
+      name: Births & Life Expectancy
+      description: Crude birth rate, fertility rate, and life expectancy at birth.
+    - id: education
+      name: Education & Technology
+      description: Educational attainment (graduate degrees) and internet use.

@@ -1,6 +1,7 @@
 import re
 import time
 from datetime import datetime
+from pathlib import Path
 
 import typer
 from rich.console import Console
@@ -70,6 +71,10 @@ def _sparkline(values: list[float]) -> str:
     return "".join(SPARK[int((v - lo) / span * (len(SPARK) - 1))] for v in values)
 
 
+def _fmt_p(p: float | None) -> str:
+    return "—" if p is None else f"{p:.2f}"
+
+
 def _parse_interval(text: str) -> int:
     match = re.fullmatch(r"(\d+)([smhd])", text)
     if not match:
@@ -130,6 +135,29 @@ def catalog_add(
         if sync:
             with _connect() as conn:
                 _print_result(sync_series(conn, src, series_id))
+
+
+@catalog_app.command("import-snapshot")
+def catalog_import_snapshot(
+    path: Path = typer.Argument(..., help="e.g. data/fred/series-snapshot.json"),
+    source: str = typer.Option("fred"),
+):
+    """Load series metadata from a snapshot file into the database (no observations).
+
+    Browsable in `tempus serve` right away; catalog.toml is unchanged. Run
+    `tempus ontology load` next to place them using ontology/placements.draft.yaml.
+    """
+    from tempus.snapshot import SnapshotError, import_snapshot
+
+    with _connect() as conn:
+        try:
+            inserted, refreshed = import_snapshot(conn, path, source)
+        except (SnapshotError, OSError, ValueError) as exc:
+            console.print(f"[red]{exc}[/red]")
+            raise typer.Exit(1) from exc
+    console.print(
+        f"[green]{inserted} series added[/green], {refreshed} refreshed (synced ones kept)"
+    )
 
 
 @catalog_app.command("remove")
@@ -334,18 +362,35 @@ def _load_ontology(conn, settings, *, quiet: bool = False) -> list[ontology.Conc
     if bad:
         console.print(f"[red]catalog.toml pins to unknown concepts:[/red] {', '.join(sorted(bad))}")
         raise typer.Exit(1)
+    try:
+        drafts = ontology.load_drafts(settings.drafts_path)
+    except (ontology.OntologyError, OSError) as exc:
+        console.print(f"[red]{exc}[/red]")
+        raise typer.Exit(1) from exc
+    stale = sorted({d.concept for d in drafts.values() if d.concept not in known})
     upserted, removed = ontology.sync_to_db(conn, roots)
     pinned = ontology.apply_pins(conn, pins)
+    drafted = ontology.apply_drafts(conn, drafts)
     if not quiet:
         console.print(
-            f"[green]{upserted} concepts loaded[/green] ({removed} removed), {pinned} pins"
+            f"[green]{upserted} concepts loaded[/green] ({removed} removed), {pinned} pins, "
+            f"{drafted} draft placements"
         )
+        if stale:
+            console.print(
+                f"[yellow]{settings.drafts_path} names unknown concepts (skipped):[/yellow] "
+                + ", ".join(stale)
+            )
     return roots
 
 
 @ontology_app.command("load")
 def ontology_load():
-    """Validate ontology/concepts.yaml and catalog pins, and load them into the database."""
+    """Validate ontology/concepts.yaml, catalog pins and draft placements, and load them.
+
+    Draft placements (ontology/placements.draft.yaml) fill in series that have no pin and
+    no Jev decision yet; `tempus ontology file` replaces them with real filing.
+    """
     with _connect() as conn:
         _load_ontology(conn, get_settings())
 
@@ -354,7 +399,7 @@ def ontology_load():
 def ontology_file(
     refile: bool = typer.Option(False, help="Re-decide existing auto placements too"),
 ):
-    """Place unfiled series in the tree with Jev. Manual pins are never changed."""
+    """Place unfiled and draft-placed series in the tree with Jev. Pins are never changed."""
     settings = get_settings()
     try:
         jev = JevClient(settings.typesafe_api_key)
@@ -415,7 +460,7 @@ def ontology_tree(
         )
 
     def label(r) -> str:
-        how = "📌" if r["method"] == "manual" else f"{r['confidence']:.2f}"
+        how = {"manual": "📌", "draft": "draft"}.get(r["method"]) or _fmt_p(r["confidence"])
         return f"[cyan]{r['series_id']}[/cyan] [dim]{(r['title'] or '')[:60]} · {how}[/dim]"
 
     def add(node: Tree, parent_id: str | None) -> None:
@@ -439,6 +484,49 @@ def ontology_tree(
         for r in unplaced:
             pending.add(f"[cyan]{r['series_id']}[/cyan] [dim]{(r['title'] or '')[:60]}[/dim]")
     console.print(root)
+
+
+@app.command()
+def resolve(
+    phrase: str = typer.Argument(..., help='e.g. "crude oil price"'),
+    limit: int = typer.Option(10, help="How many series to list"),
+    lexical: bool = typer.Option(False, help="Use the lexical fallback even with a key"),
+):
+    """Find the concepts and series a phrase means, by walking the tree (Jevbox-style)."""
+    from tempus.explore import catalog_from_db
+    from tempus.navigate import LexicalChooser, navigate
+
+    settings = get_settings()
+    with _connect() as conn:
+        catalog = catalog_from_db(conn)
+    if not catalog.roots:
+        console.print("[yellow]No concepts loaded.[/yellow] Run `tempus ontology load`.")
+        raise typer.Exit(1)
+    if settings.typesafe_api_key and not lexical:
+        chooser, label = JevClient(settings.typesafe_api_key), "jev"
+    else:
+        chooser, label = LexicalChooser(catalog), "lexical fallback"
+    try:
+        result = navigate(phrase, catalog, chooser, label=label)
+    except JevError as exc:
+        console.print(f"[red]{exc}[/red]")
+        raise typer.Exit(1) from exc
+    console.print(f"[dim]chooser: {result.chooser}[/dim]")
+    if not result.paths:
+        console.print("[yellow]Nothing in the tree fits that.[/yellow]")
+        raise typer.Exit(1)
+    for path in result.paths:
+        trail = " › ".join(
+            f"{name} [dim]{step['p']:.2f}[/dim]"
+            for name, step in zip(path.to_dict(catalog)["names"], path.steps, strict=True)
+        )
+        console.print(f"[bold]{path.score:.2f}[/bold]  {trail}")
+    if result.ambiguous:
+        console.print("[yellow]Ambiguous:[/yellow] the top routes are close; check both.")
+    table = Table("series", "p", "title")
+    for s in result.series[:limit]:
+        table.add_row(f"{s['source']}:{s['series_id']}", f"{s['p']:.2f}", s["title"] or "")
+    console.print(table)
 
 
 CARD_TEMPLATE = """\

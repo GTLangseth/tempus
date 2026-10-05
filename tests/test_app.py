@@ -68,5 +68,13 @@ def test_card_event(settings, tmp_path: Path):
     assert card_event(repo, settings.cards_path / "notes.txt") is None
 
 
+@pytest.mark.parametrize("name", [".#lead.yaml", "lead.tmp.yaml", "Lead Copy.yaml", "~lead.yaml"])
+def test_card_event_ignores_editor_temp_files(settings, name):
+    # Editors write these next to the real file; they aren't cards and shouldn't flash errors.
+    path = settings.cards_path / name
+    path.write_text("title: [half-saved\n")
+    assert card_event(FileCardRepository(settings.cards_path), path) is None
+
+
 def test_static_index_is_served(settings):
     assert TestClient(create_app(settings)).get("/").status_code == 200

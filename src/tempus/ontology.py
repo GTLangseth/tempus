@@ -6,8 +6,11 @@ from pathlib import Path
 
 import psycopg
 import yaml
+from psycopg.types.json import Jsonb
 
 SLUG = re.compile(r"[a-z][a-z0-9_]*")
+REF = re.compile(r"([a-z][a-z0-9_]*):(\S+)")
+DRAFTS_VERSION = 1
 
 
 class OntologyError(ValueError):
@@ -50,6 +53,16 @@ def _parse(nodes, parent_id: str | None, where: str) -> list[Concept]:
         concept.children = _parse(node.get("children", []), concept_id, here)
         concepts.append(concept)
     return concepts
+
+
+def from_rows(rows) -> list[Concept]:
+    """Rebuild the tree from `concepts` rows (id, parent_id, name, description, position)."""
+    nodes = {r["id"]: Concept(r["id"], r["name"], r["description"], r["parent_id"]) for r in rows}
+    roots = []
+    for r in sorted(rows, key=lambda r: (r["position"], r["id"])):
+        parent = nodes.get(r["parent_id"]) if r["parent_id"] else None
+        (parent.children if parent else roots).append(nodes[r["id"]])
+    return roots
 
 
 def walk(concepts: list[Concept]):
@@ -114,4 +127,80 @@ def apply_pins(conn: psycopg.Connection, pins: dict[tuple[str, str], str]) -> in
                 (source, series_id, concept_id),
             )
             applied += 1
+    return applied
+
+
+@dataclass(frozen=True)
+class Draft:
+    concept: str
+    low: str | None = None  # why it was a judgment call, if it was one
+
+
+def load_drafts(path: Path) -> dict[tuple[str, str], Draft]:
+    """Parse ontology/placements.draft.yaml: concept id -> series refs. Missing file = none."""
+    if not path.exists():
+        return {}
+    raw = yaml.safe_load(path.read_text()) or {}
+    if not isinstance(raw, dict) or raw.get("version") != DRAFTS_VERSION:
+        raise OntologyError(f"{path.name}: expected `version: {DRAFTS_VERSION}`")
+    drafts: dict[tuple[str, str], Draft] = {}
+    for concept, refs in (raw.get("placements") or {}).items():
+        for entry in refs or []:
+            ref, low = (
+                (entry.get("ref", ""), entry.get("low"))
+                if isinstance(entry, dict)
+                else (
+                    str(entry),
+                    None,
+                )
+            )
+            match = REF.fullmatch(ref)
+            if not match:
+                raise OntologyError(f"{path.name} › {concept}: {ref!r} is not source:series_id")
+            key = (match[1], match[2])
+            if key in drafts:
+                raise OntologyError(f"{path.name}: {ref} is placed more than once")
+            drafts[key] = Draft(str(concept), low)
+    return drafts
+
+
+def apply_drafts(conn: psycopg.Connection, drafts: dict[tuple[str, str], Draft]) -> int:
+    """Record draft placements where nothing better exists. Returns how many were applied.
+
+    Precedence is manual > auto > draft: a draft never replaces a pin or a Jev decision, and
+    `filing.file_series` treats drafts as unfiled. Drafts for series that aren't in the
+    database yet, or for concepts the tree no longer has, are skipped.
+    """
+    applied = 0
+    with conn.transaction():
+        # Drafts removed from (or moved in) the file follow it.
+        conn.execute(
+            """
+            DELETE FROM series_concepts
+            WHERE method = 'draft' AND NOT ((source || ':' || series_id) = ANY(%s))
+            """,
+            ([f"{s}:{i}" for s, i in drafts],),
+        )
+        for (source, series_id), draft in drafts.items():
+            row = conn.execute(
+                """
+                INSERT INTO series_concepts (source, series_id, concept_id, method, trail)
+                SELECT %(source)s, %(series_id)s, %(concept)s, 'draft', %(trail)s
+                WHERE EXISTS (SELECT 1 FROM series
+                              WHERE source = %(source)s AND series_id = %(series_id)s)
+                  AND EXISTS (SELECT 1 FROM concepts WHERE id = %(concept)s)
+                ON CONFLICT (source, series_id) DO UPDATE SET
+                    concept_id = EXCLUDED.concept_id, trail = EXCLUDED.trail,
+                    confidence = NULL, filed_at = now()
+                WHERE series_concepts.method = 'draft'
+                RETURNING 1
+                """,
+                {
+                    "source": source,
+                    "series_id": series_id,
+                    "concept": draft.concept,
+                    "trail": Jsonb([{"draft": True, "low": draft.low}]),
+                },
+            ).fetchone()
+            applied += row is not None
     return applied

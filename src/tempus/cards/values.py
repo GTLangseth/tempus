@@ -23,6 +23,7 @@ class Series:
     freq: str  # one of FREQS, or "irregular"
     df: pl.DataFrame  # ts: Date, value: Float64, sorted by ts
     units: str | None = None
+    kind: str = "level"  # level | change (yoy, pct_change and diff produce a change)
 
 
 @dataclass(frozen=True)
@@ -85,4 +86,4 @@ def clip(s: Series, start: date | None, end: date | None) -> Series:
         df = df.filter(pl.col("ts") >= start)
     if end:
         df = df.filter(pl.col("ts") <= end)
-    return Series(s.name, s.label, s.freq, df, s.units)
+    return Series(s.name, s.label, s.freq, df, s.units, s.kind)
