@@ -37,7 +37,7 @@ and the quarterly review procedure live in [`STACK.md`](STACK.md).
 | Navigation | ✅ built | `src/tempus/navigate.py` | Phrase → concepts → series by beam search down the tree (Jev, or a labeled lexical fallback with no key): `/api/navigate`, `tempus resolve` |
 | CLI | ✅ built | `src/tempus/cli.py` | `tempus` commands for data actions: sync, catalog, inspect, search, resolve |
 | Repo tooling | ✅ built | `mise.toml` | Pins tools (Python, uv, Node) and runs repo tasks (setup, db, test, lint) |
-| Home base | 🟡 runbook ready | `docs/HOMEBASE.md`, `scripts/homebase/` | Mac mini on Tailscale: real DB and keys, `tempus serve` under launchd published with `tailscale serve`, SSH + tmux for agents from the phone (`mise run homebase:setup`) |
+| Home base | 🟡 runbook ready | `docs/HOMEBASE.md`, `scripts/homebase/` | Mac mini on Tailscale: real DB and keys, `tempus serve` under launchd published with `tailscale serve`, SSH + tmux for agents from the phone (`mise run homebase:setup`); opt-in password-gated sharing via Funnel (`mise run share:on`) |
 | Scheduler | 🟡 minimal | `tempus sync --every 6h` | A blocking loop for now; see open questions |
 | Cards | ✅ built | `cards/`, `src/tempus/cards/` | Card language v1 (inputs, formulas, panels), static checks, Polars engine, panel payloads |
 | App | ✅ built | `src/tempus/app.py`, `src/tempus/explore.py`, `src/tempus/web/` | `tempus serve`: FastAPI engine API + no-build static front end (ECharts, three.js), hot reload |
@@ -157,6 +157,17 @@ By the horizon in [`SOUL.md`](SOUL.md) where it first matters. Status: ✅ built
 
 Newest first. Each entry: what we chose, and why.
 
+- **2026-10-05 · Sharing outside the tailnet: an opt-in, password-gated Funnel to a guest
+  app.** Colleagues without Tailscale needed a way in, without making public access the
+  default. `mise run share:on` starts a second, read-only `tempus serve --share` on
+  127.0.0.1:8766, wrapped in a password gate (`src/tempus/share.py`: signed session cookies
+  whose key changes on every start, rate-limited login). It then publishes only that app with
+  `tailscale funnel` on :8443. The tailnet app on :443 stays unpublished and needs no
+  password. Sharing ends after 8 hours by default and never comes back after a reboot. We
+  chose this over gating the main app on Tailscale identity headers because a separate process
+  and port keep the public surface and the trusted one apart, with no header trust involved.
+  Cloudflare Access or Tailscale node sharing would mean accounts for guests. Runbook:
+  `docs/HOMEBASE.md` → Share with colleagues.
 - **2026-10-04 · Home base setup reuses Tailscale.app and a running Docker engine.** The
   actual mini already ran Tailscale.app and Docker Desktop (with another project's Postgres
   on 5432). Running a second Tailscale or a second container VM next to them would conflict,

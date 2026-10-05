@@ -15,7 +15,8 @@ even from your phone. Cloud agents (Claude Code routines) still do code-only wor
 
 Nothing listens on the network except SSH and Tailscale. The app and the database bind to
 localhost; Tailscale publishes the app to your tailnet only, and other devices reach the
-database through an SSH tunnel.
+database through an SSH tunnel. The one exception is [sharing](#share-with-colleagues), which
+is off unless you switch it on.
 
 ## Setup (about 20 minutes)
 
@@ -115,6 +116,48 @@ ssh -N -L 5433:127.0.0.1:5432 <you>@<mini>      # leave running; use the mini's 
 DATABASE_URL=postgres://postgres:password@localhost:5433/tempus uv run tempus series list
 ```
 
+## Share with colleagues
+
+To show tempus to people who aren't on your tailnet, switch sharing on for a while:
+
+```sh
+mise run share:on                       # off again by itself after 8 hours
+mise run share:on -- --for 2h           # or 90m, 2d, none
+mise run share:status
+mise run share:off                      # everyone is logged out at once
+```
+
+`share:on` prints the link (`https://<mini>.<tailnet>.ts.net:8443`). The password is
+`TEMPUS_SHARE_PASSWORD` in `.env`: the first run generates a random one, and
+`-- --new-password` replaces it. Send the link and the password through different channels.
+
+How it's locked down:
+
+- **One port, one app.** Funnel publishes only HTTPS port 8443, to a separate guest copy of
+  the app on `127.0.0.1:8766` (`tempus serve --share`). Your tailnet app on 443 → 8765 is
+  never published and needs no password. Never run `tailscale funnel reset`: it also wipes
+  the tailnet serve.
+- **Password page in front of everything.** Without a session cookie, pages redirect to
+  `/login` and the API answers 401. The cookie is HttpOnly, Secure and SameSite=Strict and
+  lasts 12 hours. Its signing key is new every time the guest app starts, so `share:off`
+  (or `share:on` again) logs every guest out. Five wrong passwords from one visitor, or 50
+  from everyone, lock logins for 15 minutes. Pages carry `noindex` and can't be framed.
+- **Read-only.** Guests can browse and search, but series pages never sync from FRED, and
+  `/docs` is off. Search still uses Jev, which uses your TypeSafe key.
+- **Off by default.** It turns itself off after the `--for` window: the guest app refuses
+  every request after that, and a timer also takes the Funnel down. The guest app's launchd
+  job isn't installed in `~/Library/LaunchAgents`, so it never comes back after a reboot. If
+  the Funnel config survives a reboot, `share:status` says so; run `share:off`.
+- **Only this machine may Funnel.** In the admin console (**Access controls**), grant the
+  `funnel` node attribute to the mini alone, instead of the default `autogroup:member`:
+  ```json
+  "nodeAttrs": [{ "target": ["<you>@<domain>"], "attr": ["funnel"] }]
+  ```
+  To pin it to the one machine, tag the mini (e.g. `tag:homebase`) and target the tag.
+
+A new Funnel can take a few minutes to become reachable from the internet. Test it from
+your phone with Wi-Fi off, not from the mini itself.
+
 ## Day to day
 
 | Task | Command (on the mini) |
@@ -124,6 +167,7 @@ DATABASE_URL=postgres://postgres:password@localhost:5433/tempus uv run tempus se
 | App logs | `tail -f ~/Library/Logs/tempus/com.tempus.serve.log` |
 | Stop / start the app | `launchctl bootout gui/$(id -u)/com.tempus.serve` / re-run `mise run homebase:setup` |
 | Sync now | `uv run tempus sync` |
+| Share with colleagues | `mise run share:on` / `share:off` / `share:status` |
 
 ## Unattended restarts
 

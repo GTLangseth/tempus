@@ -1,5 +1,6 @@
 from pathlib import Path
 
+from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -13,6 +14,7 @@ class Settings(BaseSettings):
     ontology_path: Path = Path("ontology/concepts.yaml")
     drafts_path: Path = Path("ontology/placements.draft.yaml")
     cards_path: Path = Path("cards")
+    share_password: str | None = Field(None, validation_alias="TEMPUS_SHARE_PASSWORD")
 
 
 def get_settings() -> Settings:

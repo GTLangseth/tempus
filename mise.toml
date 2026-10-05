@@ -73,6 +73,18 @@ run = "bash scripts/homebase/setup.sh"
 description = "Home base health: tailnet, serve, Remote Login, Colima, DB, launchd agents"
 run = "bash scripts/homebase/status.sh"
 
+[tasks."share:on"]
+description = "Share the app outside the tailnet: password-gated, read-only, via Funnel on :8443; off after 8h (-- --for 2h|none, --new-password)"
+run = "bash scripts/homebase/share.sh on"
+
+[tasks."share:off"]
+description = "Stop sharing: take down the Funnel and the guest app (logs every guest out)"
+run = "bash scripts/homebase/share.sh off"
+
+[tasks."share:status"]
+description = "Is the app shared outside the tailnet right now?"
+run = "bash scripts/homebase/share.sh status"
+
 [tasks.test]
 description = "Run the test suite"
 run = "uv run pytest"
