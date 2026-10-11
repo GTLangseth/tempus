@@ -1,6 +1,12 @@
+from collections import Counter
+from pathlib import Path
+
 import pytest
 
+from tempus.drafting import SHAPES
 from tempus.evals import Case, EvalFileError, check_cases, known_series, load_cases
+
+ROOT = Path(__file__).resolve().parent.parent
 
 ONE_CASE = """
 version: 1
@@ -143,3 +149,20 @@ def test_check_unknown_series():
     assert check_cases([case(roles=(("fred:NOPE",),))], {"fred:UNRATE"}) == [
         "c: roles[1] fred:NOPE is not in the snapshot or catalog"
     ]
+
+
+@pytest.fixture(scope="module")
+def real_cases() -> list[Case]:
+    return load_cases(ROOT / "evals/drafting.yaml")
+
+
+def test_real_eval_file_checks_clean(real_cases):
+    known = known_series(ROOT / "data/fred/series-snapshot.json", ROOT / "catalog.toml")
+    assert check_cases(real_cases, known) == []
+
+
+def test_real_eval_file_meets_coverage_rules(real_cases):
+    per_shape = Counter(c.shape for c in real_cases)
+    assert {name: per_shape[name] >= 2 for name in SHAPES} == {name: True for name in SHAPES}
+    assert sum(len(c.roles) > 1 for c in real_cases) >= 8
+    assert 2 <= sum(c.xfail is not None for c in real_cases) <= 3
