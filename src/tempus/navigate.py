@@ -110,9 +110,22 @@ class Navigation:
 
 
 def navigate(
-    query: str, catalog: Catalog, chooser: Chooser, *, beam: int = BEAM, label: str = ""
+    query: str,
+    catalog: Catalog,
+    chooser: Chooser,
+    *,
+    role: str | None = None,
+    beam: int = BEAM,
+    label: str = "",
 ) -> Navigation:
-    state = {"query": query}
+    """With `role`, find only the series that plays that part in the query (e.g. "the measure
+    that moves first" in "does crude lead gasoline?"). The role goes into the text Jev reads,
+    the query and every question; a separate `find` field alone didn't steer it."""
+    if role:
+        state = {"query": f"{query} (Find only {role}.)", "find": role}
+        wanted = f"{role} in this request"
+    else:
+        state, wanted = {"query": query}, "the data this request asks for"
     frontier = [Path()]
     done: list[Path] = []
     while frontier:
@@ -128,10 +141,10 @@ def navigate(
             criteria = {slug: concept_text(c) for slug, c in by_slug.items()}
             if parent is None:
                 criteria[NONE] = "None of these areas is what the request is about."
-                question = "Which area of the economy holds the data this request asks for?"
+                question = f"Which area of the economy holds {wanted}?"
             else:
                 criteria[NONE] = f"None of these; the request is about {parent.name} generally."
-                question = f"Which part of {parent.name} holds the data this request asks for?"
+                question = f"Which part of {parent.name} holds {wanted}?"
             ranked = chooser.choice(state, question, criteria).ranked()
             p_none = dict(ranked).get(NONE, 0.0)
             top = [[k, round(p, 3)] for k, p in ranked[:3]]
@@ -146,17 +159,32 @@ def navigate(
         frontier = sorted(grown, key=lambda p: -p.score)[:beam]
     paths = sorted(done, key=lambda p: -p.score)[:beam]
     return Navigation(
-        query, label or type(chooser).__name__, paths, _rank_series(query, catalog, chooser, paths)
+        query,
+        label or type(chooser).__name__,
+        paths,
+        _rank_series(query, state, role, catalog, chooser, paths),
     )
 
 
-def _rank_series(query: str, catalog: Catalog, chooser: Chooser, paths: list[Path]) -> list[dict]:
+def _rank_series(
+    query: str,
+    state: dict,
+    role: str | None,
+    catalog: Catalog,
+    chooser: Chooser,
+    paths: list[Path],
+) -> list[dict]:
     """Rank the series under each reached concept, best route first.
 
     Each route gets its own menu, so series compete with their neighbors rather than with
     another route's; `score` (route score x series probability) is reported for comparison.
     Popularity breaks near-ties, e.g. UNRATE over the same title for a single state.
     """
+    question = (
+        f"Which data series is {role} in this request?"
+        if role
+        else "Which data series is the one this request asks for?"
+    )
     out: list[dict] = []
     seen: set[str] = set()
     for rank, path in enumerate(paths):
@@ -175,9 +203,7 @@ def _rank_series(query: str, catalog: Catalog, chooser: Chooser, paths: list[Pat
         )[:SERIES_MENU]
         criteria = {ref: series_text(candidates[ref]) for ref in menu}
         criteria[NONE] = "None of these series is what the request asks for."
-        probs = chooser.choice(
-            {"query": query}, "Which data series is the one this request asks for?", criteria
-        ).probabilities
+        probs = chooser.choice(state, question, criteria).probabilities
         ranked = [
             candidates[ref]
             | {

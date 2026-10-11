@@ -905,6 +905,125 @@ def card_load():
     console.print(f"Loaded {loaded} card(s)")
 
 
+def _eval_cases():
+    from tempus import evals
+
+    settings = Settings()
+    try:
+        cases = evals.load_cases(Path(evals.EVALS_PATH))
+    except (evals.EvalFileError, OSError) as exc:
+        console.print(f"[red]{exc}[/red]")
+        raise typer.Exit(1) from exc
+    known = evals.known_series(Path("data/fred/series-snapshot.json"), settings.catalog_path)
+    problems = evals.check_cases(cases, known)
+    for problem in problems:
+        console.print(f"[red]{evals.EVALS_PATH}:[/red] {problem}")
+    if problems:
+        raise typer.Exit(1)
+    return cases
+
+
+def _run_eval(drafter, conn, label: str, runs: int, json_out: Path | None) -> None:
+    import json
+
+    from tempus.grading import run_eval
+
+    cases = _eval_cases()
+    console.print(f"[dim]chooser: {label} · {len(cases)} cases × {runs} runs[/dim]")
+
+    def progress(run, case, grade):
+        mark = "[green]pass[/green]" if grade.passed else f"[red]{grade.stage}[/red]"
+        console.print(f"[dim]run {run}[/dim] {case.id:<28} {mark}")
+
+    try:
+        report = run_eval(cases, drafter, conn, runs=runs, on_case=progress)
+    except JevError as exc:
+        console.print(f"[red]{exc}[/red]")
+        raise typer.Exit(1) from exc
+    typer.echo("\n" + report.to_text())
+    if json_out:
+        json_out.parent.mkdir(parents=True, exist_ok=True)
+        json_out.write_text(json.dumps(report.to_json() | {"chooser": label}, indent=2) + "\n")
+        console.print(f"Wrote [bold]{json_out}[/bold]")
+
+
+@card_app.command("draft")
+def card_draft(
+    question: str | None = typer.Argument(None, help='e.g. "Does crude lead gasoline CPI?"'),
+    lexical: bool = typer.Option(False, help="Use the lexical fallback even with a key"),
+    save: bool = typer.Option(False, help="Write the card to cards/<id>.yaml"),
+    eval_: bool = typer.Option(
+        False, "--eval", help="Draft every question in evals/drafting.yaml and grade each stage"
+    ),
+    runs: int = typer.Option(3, help="With --eval: runs per question (Jev drifts between calls)"),
+    json_out: Path | None = typer.Option(None, "--json", help="With --eval: write the report"),
+    offline: bool = typer.Option(
+        False, help="With --eval: only validate evals/drafting.yaml (no Jev, no database)"
+    ),
+):
+    """Draft a card that answers a question: Jev picks the shape and a series per role.
+
+    With --eval, draft every question in evals/drafting.yaml and grade each stage.
+    """
+    from tempus.drafting import JevDrafter, card_yaml
+    from tempus.explore import catalog_from_db
+    from tempus.navigate import LexicalChooser
+
+    if eval_ and offline:
+        console.print(f"[green]{len(_eval_cases())} eval cases check clean[/green]")
+        return
+    if not eval_ and not question:
+        raise typer.BadParameter("give a question, or --eval")
+    settings = get_settings()
+    can_sync = settings.fred_api_key and settings.db != "prod"
+    sync_source = (
+        (lambda name: get_source(name, settings) if name in SOURCE_NAMES else None)
+        if can_sync
+        else None
+    )
+    with _connect() as conn:
+        if settings.typesafe_api_key and not lexical:
+            chooser, label = JevClient(settings.typesafe_api_key), "jev"
+        else:
+            chooser, label = LexicalChooser(catalog_from_db(conn)), "lexical fallback"
+        drafter = JevDrafter(conn, chooser, sync_source=sync_source)
+        if not drafter.catalog.roots:
+            console.print("[yellow]No concepts loaded.[/yellow] Run `tempus ontology load`.")
+            raise typer.Exit(1)
+        if eval_:
+            _run_eval(drafter, conn, label, runs, json_out)
+            return
+        try:
+            draft = drafter.draft(question)
+        except JevError as exc:
+            console.print(f"[red]{exc}[/red]")
+            raise typer.Exit(1) from exc
+    console.print(f"[dim]chooser: {label}[/dim]")
+    top = " · ".join(f"{name} {p:.2f}" for name, p in draft.shape.ranked()[:3])
+    console.print(f"[bold]shape[/bold]  {top}")
+    for pick in draft.picks:
+        console.print(f"[bold]{pick.role}[/bold]  {pick.series} {pick.probability:.2f}")
+        if pick.runners_up:
+            others = ", ".join(f"{ref} {p:.2f}" for ref, p in pick.runners_up)
+            console.print(f"  [dim]runners-up: {others}[/dim]")
+    for ref in draft.synced:
+        console.print(f"[dim]synced {ref}[/dim]")
+    if draft.card is None:
+        console.print(f"[red]Could not draft a card:[/red] {draft.error}")
+        raise typer.Exit(1)
+    text = card_yaml(draft.card)
+    typer.echo("\n" + text, nl=False)  # unwrapped, so it pastes as a card file
+    if save:
+        words = re.sub(r"[^a-z0-9]+", " ", draft.card.title.lower()).split()
+        path = _cards().path("-".join(words[:6]))
+        if path.exists():
+            console.print(f"[red]{path} already exists; not overwriting[/red]")
+            raise typer.Exit(1)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(text)
+        console.print(f"\nWrote [bold]{path}[/bold]")
+
+
 @card_app.command("functions")
 def card_functions(name: str | None = typer.Argument(None)):
     """The function catalog, or one entry with its caveat."""

@@ -56,6 +56,12 @@ Roughly in order. Each horizon builds on the ones before it.
 6. **Signal:** turn cards into signals, backtest them honestly, and use them to guide
    portfolio composition and hedging.
 
+The core bet sits across these horizons. Tempus is worth returning to only if a question
+becomes a card that combines the right series in the right way to answer it. Watches,
+precedents and digests are only as good as the cards underneath them. So drafting a card
+from a question comes first, judged by a measured eval, even though it belongs to
+Converse. The horizon order bends around it.
+
 ## Values
 
 - **Understanding over automation.** Tempus supports decisions; it doesn't make them. A

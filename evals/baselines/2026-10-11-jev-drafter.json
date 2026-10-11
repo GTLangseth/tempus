@@ -1,0 +1,836 @@
+{
+  "runs": 3,
+  "timestamp": "2026-10-11T17:58:46.818484+00:00",
+  "stages": {
+    "shape": {
+      "mean": 0.88,
+      "min": 0.88,
+      "max": 0.88
+    },
+    "series": {
+      "mean": 0.38666666666666666,
+      "min": 0.36,
+      "max": 0.4
+    },
+    "valid": {
+      "mean": 0.38666666666666666,
+      "min": 0.36,
+      "max": 0.4
+    },
+    "renders": {
+      "mean": 0.38666666666666666,
+      "min": 0.36,
+      "max": 0.4
+    }
+  },
+  "passed": {
+    "mean": 0.38666666666666666,
+    "min": 0.36,
+    "max": 0.4
+  },
+  "limiting_stage": "series",
+  "failures": {
+    "shape": 9,
+    "series": 37,
+    "valid": 0,
+    "renders": 0
+  },
+  "cases": [
+    {
+      "id": "unemployment-now",
+      "passed": 3,
+      "xfail": false,
+      "stage": null,
+      "reason": null
+    },
+    {
+      "id": "payrolls-growth",
+      "passed": 0,
+      "xfail": false,
+      "stage": "series",
+      "reason": "the measure: picked fred:A576RC1 (0.47), acceptable fred:PAYEMS, fred:PAYNSA, fred:ADPMNUSNERSA, fred:ADPWNUSNERSA"
+    },
+    {
+      "id": "cpi-yoy",
+      "passed": 0,
+      "xfail": false,
+      "stage": "series",
+      "reason": "the measure: picked fred:CPALTT01USM659N (0.76), acceptable fred:CPIAUCSL, fred:CPIAUCNS"
+    },
+    {
+      "id": "inflation-running",
+      "passed": 0,
+      "xfail": false,
+      "stage": "shape",
+      "reason": "chose level (0.66), expected change (0.34)"
+    },
+    {
+      "id": "gdp",
+      "passed": 3,
+      "xfail": false,
+      "stage": null,
+      "reason": null
+    },
+    {
+      "id": "real-gdp-growth",
+      "passed": 0,
+      "xfail": false,
+      "stage": "series",
+      "reason": "the measure: picked fred:OB000334Q (0.36), acceptable fred:GDPC1, fred:ND000334Q, fred:GDPCA"
+    },
+    {
+      "id": "core-pce-above-target",
+      "passed": 0,
+      "xfail": false,
+      "stage": "series",
+      "reason": "the measure: picked fred:DPCCRV1A225NBEA (0.42), acceptable fred:PCEPILFE"
+    },
+    {
+      "id": "sahm-triggered",
+      "passed": 0,
+      "xfail": false,
+      "stage": "series",
+      "reason": "the measure: picked fred:UNRATE (0.52), acceptable fred:SAHMREALTIME, fred:SAHMCURRENT"
+    },
+    {
+      "id": "ppi-leads-cpi",
+      "passed": 3,
+      "xfail": false,
+      "stage": null,
+      "reason": null
+    },
+    {
+      "id": "ten-minus-two",
+      "passed": 0,
+      "xfail": false,
+      "stage": "series",
+      "reason": "picked 0 series for 2 roles"
+    },
+    {
+      "id": "ten-minus-three-month",
+      "passed": 0,
+      "xfail": false,
+      "stage": "series",
+      "reason": "the measure subtracted from: picked fred:T10Y3M (0.73), acceptable fred:DGS10, fred:GS10, fred:WGS10YR, fred:IRLTLT01USM156N"
+    },
+    {
+      "id": "curve-inverted",
+      "passed": 3,
+      "xfail": false,
+      "stage": null,
+      "reason": null
+    },
+    {
+      "id": "mortgage-minus-ten-year",
+      "passed": 0,
+      "xfail": false,
+      "stage": "series",
+      "reason": "the measure subtracted from: picked fred:T10Y2Y (0.05), acceptable fred:MORTGAGE30US, fred:OBMMIC30YF"
+    },
+    {
+      "id": "fed-leads-mortgages",
+      "passed": 3,
+      "xfail": false,
+      "stage": null,
+      "reason": null
+    },
+    {
+      "id": "breakevens",
+      "passed": 0,
+      "xfail": false,
+      "stage": "series",
+      "reason": "the first measure: picked fred:DFII10 (0.25), acceptable fred:T10YIE, fred:T10YIEM"
+    },
+    {
+      "id": "oil-and-gasoline",
+      "passed": 3,
+      "xfail": false,
+      "stage": null,
+      "reason": null
+    },
+    {
+      "id": "gold-versus-dollar",
+      "passed": 0,
+      "xfail": false,
+      "stage": "series",
+      "reason": "the first measure: picked fred:NASDAQXAU (0.16), acceptable fred:NASDAQQGLDI"
+    },
+    {
+      "id": "sp500-in-gold",
+      "passed": 1,
+      "xfail": false,
+      "stage": "series",
+      "reason": "the denominator: picked fred:M1109BUSM293NNBR (0.01), acceptable fred:NASDAQQGLDI"
+    },
+    {
+      "id": "nasdaq-vs-sp500",
+      "passed": 0,
+      "xfail": false,
+      "stage": "shape",
+      "reason": "chose compare (0.98), expected ratio (0.02)"
+    },
+    {
+      "id": "real-oil-price",
+      "passed": 0,
+      "xfail": false,
+      "stage": "shape",
+      "reason": "chose level (0.99), expected ratio (0.01)"
+    },
+    {
+      "id": "yen-move",
+      "passed": 3,
+      "xfail": false,
+      "stage": null,
+      "reason": null
+    },
+    {
+      "id": "crude-leads-gasoline-cpi",
+      "passed": 1,
+      "xfail": false,
+      "stage": "series",
+      "reason": "the measure that moves first: picked fred:CUSR0000SETB01 (0.16), acceptable fred:DCOILWTICO, fred:DCOILBRENTEU, fred:WTISPLC, fred:MCOILWTICO, fred:WCOILWTICO, fred:WPU0561"
+    },
+    {
+      "id": "coffee-pass-through",
+      "passed": 3,
+      "xfail": false,
+      "stage": null,
+      "reason": null
+    },
+    {
+      "id": "home-prices-lead-shelter",
+      "passed": 0,
+      "xfail": false,
+      "stage": "series",
+      "reason": "the measure that moves first: picked fred:CUSR0000SEHC (0.13), acceptable fred:CSUSHPINSA, fred:CSUSHPISA, fred:SPCS20RSA, fred:SPCS20RNSA, fred:SPCS10RSA, fred:USSTHPI, fred:HPIPONM226S"
+    },
+    {
+      "id": "wages-and-inflation",
+      "passed": 3,
+      "xfail": false,
+      "stage": null,
+      "reason": null
+    },
+    {
+      "id": "gold-spot",
+      "passed": 3,
+      "xfail": true,
+      "stage": null,
+      "reason": null
+    },
+    {
+      "id": "fed-expectations",
+      "passed": 0,
+      "xfail": true,
+      "stage": "series",
+      "reason": "the measure: picked fred:FEDTARMD (0.12), acceptable fred:DGS1, fred:GS1, fred:DTB1YR, fred:TB1YR"
+    },
+    {
+      "id": "gasoline-crack-spread",
+      "passed": 0,
+      "xfail": true,
+      "stage": "series",
+      "reason": "the measure subtracted from: picked fred:DCOILWTICO (0.49), acceptable fred:DGASNYH, fred:DGASUSGULF"
+    }
+  ],
+  "xfail_passed": [
+    "gold-spot"
+  ],
+  "grades": [
+    [
+      {
+        "case_id": "unemployment-now",
+        "passed": true,
+        "stage": null,
+        "reason": null,
+        "xfail": false
+      },
+      {
+        "case_id": "payrolls-growth",
+        "passed": false,
+        "stage": "series",
+        "reason": "the measure: picked fred:A576RC1 (0.46), acceptable fred:PAYEMS, fred:PAYNSA, fred:ADPMNUSNERSA, fred:ADPWNUSNERSA",
+        "xfail": false
+      },
+      {
+        "case_id": "cpi-yoy",
+        "passed": false,
+        "stage": "series",
+        "reason": "the measure: picked fred:CPALTT01USM659N (0.76), acceptable fred:CPIAUCSL, fred:CPIAUCNS",
+        "xfail": false
+      },
+      {
+        "case_id": "inflation-running",
+        "passed": false,
+        "stage": "shape",
+        "reason": "chose level (0.67), expected change (0.33)",
+        "xfail": false
+      },
+      {
+        "case_id": "gdp",
+        "passed": true,
+        "stage": null,
+        "reason": null,
+        "xfail": false
+      },
+      {
+        "case_id": "real-gdp-growth",
+        "passed": false,
+        "stage": "series",
+        "reason": "the measure: picked fred:OB000334Q (0.36), acceptable fred:GDPC1, fred:ND000334Q, fred:GDPCA",
+        "xfail": false
+      },
+      {
+        "case_id": "core-pce-above-target",
+        "passed": false,
+        "stage": "series",
+        "reason": "the measure: picked fred:DPCCRV1A225NBEA (0.49), acceptable fred:PCEPILFE",
+        "xfail": false
+      },
+      {
+        "case_id": "sahm-triggered",
+        "passed": false,
+        "stage": "series",
+        "reason": "the measure: picked fred:UNRATE (0.47), acceptable fred:SAHMREALTIME, fred:SAHMCURRENT",
+        "xfail": false
+      },
+      {
+        "case_id": "ppi-leads-cpi",
+        "passed": true,
+        "stage": null,
+        "reason": null,
+        "xfail": false
+      },
+      {
+        "case_id": "ten-minus-two",
+        "passed": false,
+        "stage": "series",
+        "reason": "picked 0 series for 2 roles",
+        "xfail": false
+      },
+      {
+        "case_id": "ten-minus-three-month",
+        "passed": false,
+        "stage": "series",
+        "reason": "the measure subtracted from: picked fred:T10Y3M (0.65), acceptable fred:DGS10, fred:GS10, fred:WGS10YR, fred:IRLTLT01USM156N",
+        "xfail": false
+      },
+      {
+        "case_id": "curve-inverted",
+        "passed": true,
+        "stage": null,
+        "reason": null,
+        "xfail": false
+      },
+      {
+        "case_id": "mortgage-minus-ten-year",
+        "passed": false,
+        "stage": "series",
+        "reason": "the measure subtracted from: picked fred:T10YFF (0.08), acceptable fred:MORTGAGE30US, fred:OBMMIC30YF",
+        "xfail": false
+      },
+      {
+        "case_id": "fed-leads-mortgages",
+        "passed": true,
+        "stage": null,
+        "reason": null,
+        "xfail": false
+      },
+      {
+        "case_id": "breakevens",
+        "passed": false,
+        "stage": "series",
+        "reason": "the first measure: picked fred:DFII10 (0.28), acceptable fred:T10YIE, fred:T10YIEM",
+        "xfail": false
+      },
+      {
+        "case_id": "oil-and-gasoline",
+        "passed": true,
+        "stage": null,
+        "reason": null,
+        "xfail": false
+      },
+      {
+        "case_id": "gold-versus-dollar",
+        "passed": false,
+        "stage": "series",
+        "reason": "the first measure: picked fred:NASDAQXAU (0.22), acceptable fred:NASDAQQGLDI",
+        "xfail": false
+      },
+      {
+        "case_id": "sp500-in-gold",
+        "passed": false,
+        "stage": "series",
+        "reason": "the denominator: picked fred:NASDAQXAU (0.06), acceptable fred:NASDAQQGLDI",
+        "xfail": false
+      },
+      {
+        "case_id": "nasdaq-vs-sp500",
+        "passed": false,
+        "stage": "shape",
+        "reason": "chose compare (0.99), expected ratio (0.01)",
+        "xfail": false
+      },
+      {
+        "case_id": "real-oil-price",
+        "passed": false,
+        "stage": "shape",
+        "reason": "chose level (1.00), expected ratio (0.00)",
+        "xfail": false
+      },
+      {
+        "case_id": "yen-move",
+        "passed": true,
+        "stage": null,
+        "reason": null,
+        "xfail": false
+      },
+      {
+        "case_id": "crude-leads-gasoline-cpi",
+        "passed": false,
+        "stage": "series",
+        "reason": "the measure that moves first: picked fred:CUSR0000SETB01 (0.16), acceptable fred:DCOILWTICO, fred:DCOILBRENTEU, fred:WTISPLC, fred:MCOILWTICO, fred:WCOILWTICO, fred:WPU0561",
+        "xfail": false
+      },
+      {
+        "case_id": "coffee-pass-through",
+        "passed": true,
+        "stage": null,
+        "reason": null,
+        "xfail": false
+      },
+      {
+        "case_id": "home-prices-lead-shelter",
+        "passed": false,
+        "stage": "series",
+        "reason": "the measure that moves first: picked fred:CUSR0000SEHC (0.12), acceptable fred:CSUSHPINSA, fred:CSUSHPISA, fred:SPCS20RSA, fred:SPCS20RNSA, fred:SPCS10RSA, fred:USSTHPI, fred:HPIPONM226S",
+        "xfail": false
+      },
+      {
+        "case_id": "wages-and-inflation",
+        "passed": true,
+        "stage": null,
+        "reason": null,
+        "xfail": false
+      },
+      {
+        "case_id": "gold-spot",
+        "passed": true,
+        "stage": null,
+        "reason": null,
+        "xfail": true
+      },
+      {
+        "case_id": "fed-expectations",
+        "passed": false,
+        "stage": "series",
+        "reason": "the measure: picked fred:FEDTARMD (0.13), acceptable fred:DGS1, fred:GS1, fred:DTB1YR, fred:TB1YR",
+        "xfail": true
+      },
+      {
+        "case_id": "gasoline-crack-spread",
+        "passed": false,
+        "stage": "series",
+        "reason": "the measure subtracted from: picked fred:DCOILWTICO (0.53), acceptable fred:DGASNYH, fred:DGASUSGULF",
+        "xfail": true
+      }
+    ],
+    [
+      {
+        "case_id": "unemployment-now",
+        "passed": true,
+        "stage": null,
+        "reason": null,
+        "xfail": false
+      },
+      {
+        "case_id": "payrolls-growth",
+        "passed": false,
+        "stage": "series",
+        "reason": "the measure: picked fred:A576RC1 (0.51), acceptable fred:PAYEMS, fred:PAYNSA, fred:ADPMNUSNERSA, fred:ADPWNUSNERSA",
+        "xfail": false
+      },
+      {
+        "case_id": "cpi-yoy",
+        "passed": false,
+        "stage": "series",
+        "reason": "the measure: picked fred:CPALTT01USM659N (0.78), acceptable fred:CPIAUCSL, fred:CPIAUCNS",
+        "xfail": false
+      },
+      {
+        "case_id": "inflation-running",
+        "passed": false,
+        "stage": "shape",
+        "reason": "chose level (0.66), expected change (0.34)",
+        "xfail": false
+      },
+      {
+        "case_id": "gdp",
+        "passed": true,
+        "stage": null,
+        "reason": null,
+        "xfail": false
+      },
+      {
+        "case_id": "real-gdp-growth",
+        "passed": false,
+        "stage": "series",
+        "reason": "the measure: picked fred:OB000334Q (0.35), acceptable fred:GDPC1, fred:ND000334Q, fred:GDPCA",
+        "xfail": false
+      },
+      {
+        "case_id": "core-pce-above-target",
+        "passed": false,
+        "stage": "series",
+        "reason": "the measure: picked fred:DPCCRV1A225NBEA (0.43), acceptable fred:PCEPILFE",
+        "xfail": false
+      },
+      {
+        "case_id": "sahm-triggered",
+        "passed": false,
+        "stage": "series",
+        "reason": "the measure: picked fred:UNRATE (0.49), acceptable fred:SAHMREALTIME, fred:SAHMCURRENT",
+        "xfail": false
+      },
+      {
+        "case_id": "ppi-leads-cpi",
+        "passed": true,
+        "stage": null,
+        "reason": null,
+        "xfail": false
+      },
+      {
+        "case_id": "ten-minus-two",
+        "passed": false,
+        "stage": "series",
+        "reason": "picked 0 series for 2 roles",
+        "xfail": false
+      },
+      {
+        "case_id": "ten-minus-three-month",
+        "passed": false,
+        "stage": "series",
+        "reason": "the measure subtracted from: picked fred:T10Y3M (0.69), acceptable fred:DGS10, fred:GS10, fred:WGS10YR, fred:IRLTLT01USM156N",
+        "xfail": false
+      },
+      {
+        "case_id": "curve-inverted",
+        "passed": true,
+        "stage": null,
+        "reason": null,
+        "xfail": false
+      },
+      {
+        "case_id": "mortgage-minus-ten-year",
+        "passed": false,
+        "stage": "series",
+        "reason": "the measure subtracted from: picked fred:T10YFF (0.07), acceptable fred:MORTGAGE30US, fred:OBMMIC30YF",
+        "xfail": false
+      },
+      {
+        "case_id": "fed-leads-mortgages",
+        "passed": true,
+        "stage": null,
+        "reason": null,
+        "xfail": false
+      },
+      {
+        "case_id": "breakevens",
+        "passed": false,
+        "stage": "series",
+        "reason": "the first measure: picked fred:DFII10 (0.23), acceptable fred:T10YIE, fred:T10YIEM",
+        "xfail": false
+      },
+      {
+        "case_id": "oil-and-gasoline",
+        "passed": true,
+        "stage": null,
+        "reason": null,
+        "xfail": false
+      },
+      {
+        "case_id": "gold-versus-dollar",
+        "passed": false,
+        "stage": "series",
+        "reason": "the first measure: picked fred:NASDAQXAU (0.17), acceptable fred:NASDAQQGLDI",
+        "xfail": false
+      },
+      {
+        "case_id": "sp500-in-gold",
+        "passed": false,
+        "stage": "series",
+        "reason": "the denominator: picked fred:M1109BUSM293NNBR (0.01), acceptable fred:NASDAQQGLDI",
+        "xfail": false
+      },
+      {
+        "case_id": "nasdaq-vs-sp500",
+        "passed": false,
+        "stage": "shape",
+        "reason": "chose compare (0.98), expected ratio (0.02)",
+        "xfail": false
+      },
+      {
+        "case_id": "real-oil-price",
+        "passed": false,
+        "stage": "shape",
+        "reason": "chose level (1.00), expected ratio (0.00)",
+        "xfail": false
+      },
+      {
+        "case_id": "yen-move",
+        "passed": true,
+        "stage": null,
+        "reason": null,
+        "xfail": false
+      },
+      {
+        "case_id": "crude-leads-gasoline-cpi",
+        "passed": true,
+        "stage": null,
+        "reason": null,
+        "xfail": false
+      },
+      {
+        "case_id": "coffee-pass-through",
+        "passed": true,
+        "stage": null,
+        "reason": null,
+        "xfail": false
+      },
+      {
+        "case_id": "home-prices-lead-shelter",
+        "passed": false,
+        "stage": "series",
+        "reason": "the measure that moves first: picked fred:CUSR0000SEHC (0.11), acceptable fred:CSUSHPINSA, fred:CSUSHPISA, fred:SPCS20RSA, fred:SPCS20RNSA, fred:SPCS10RSA, fred:USSTHPI, fred:HPIPONM226S",
+        "xfail": false
+      },
+      {
+        "case_id": "wages-and-inflation",
+        "passed": true,
+        "stage": null,
+        "reason": null,
+        "xfail": false
+      },
+      {
+        "case_id": "gold-spot",
+        "passed": true,
+        "stage": null,
+        "reason": null,
+        "xfail": true
+      },
+      {
+        "case_id": "fed-expectations",
+        "passed": false,
+        "stage": "series",
+        "reason": "the measure: picked fred:FEDTARMD (0.13), acceptable fred:DGS1, fred:GS1, fred:DTB1YR, fred:TB1YR",
+        "xfail": true
+      },
+      {
+        "case_id": "gasoline-crack-spread",
+        "passed": false,
+        "stage": "series",
+        "reason": "the measure subtracted from: picked fred:DCOILWTICO (0.50), acceptable fred:DGASNYH, fred:DGASUSGULF",
+        "xfail": true
+      }
+    ],
+    [
+      {
+        "case_id": "unemployment-now",
+        "passed": true,
+        "stage": null,
+        "reason": null,
+        "xfail": false
+      },
+      {
+        "case_id": "payrolls-growth",
+        "passed": false,
+        "stage": "series",
+        "reason": "the measure: picked fred:A576RC1 (0.47), acceptable fred:PAYEMS, fred:PAYNSA, fred:ADPMNUSNERSA, fred:ADPWNUSNERSA",
+        "xfail": false
+      },
+      {
+        "case_id": "cpi-yoy",
+        "passed": false,
+        "stage": "series",
+        "reason": "the measure: picked fred:CPALTT01USM659N (0.76), acceptable fred:CPIAUCSL, fred:CPIAUCNS",
+        "xfail": false
+      },
+      {
+        "case_id": "inflation-running",
+        "passed": false,
+        "stage": "shape",
+        "reason": "chose level (0.66), expected change (0.34)",
+        "xfail": false
+      },
+      {
+        "case_id": "gdp",
+        "passed": true,
+        "stage": null,
+        "reason": null,
+        "xfail": false
+      },
+      {
+        "case_id": "real-gdp-growth",
+        "passed": false,
+        "stage": "series",
+        "reason": "the measure: picked fred:OB000334Q (0.36), acceptable fred:GDPC1, fred:ND000334Q, fred:GDPCA",
+        "xfail": false
+      },
+      {
+        "case_id": "core-pce-above-target",
+        "passed": false,
+        "stage": "series",
+        "reason": "the measure: picked fred:DPCCRV1A225NBEA (0.42), acceptable fred:PCEPILFE",
+        "xfail": false
+      },
+      {
+        "case_id": "sahm-triggered",
+        "passed": false,
+        "stage": "series",
+        "reason": "the measure: picked fred:UNRATE (0.52), acceptable fred:SAHMREALTIME, fred:SAHMCURRENT",
+        "xfail": false
+      },
+      {
+        "case_id": "ppi-leads-cpi",
+        "passed": true,
+        "stage": null,
+        "reason": null,
+        "xfail": false
+      },
+      {
+        "case_id": "ten-minus-two",
+        "passed": false,
+        "stage": "series",
+        "reason": "picked 0 series for 2 roles",
+        "xfail": false
+      },
+      {
+        "case_id": "ten-minus-three-month",
+        "passed": false,
+        "stage": "series",
+        "reason": "the measure subtracted from: picked fred:T10Y3M (0.73), acceptable fred:DGS10, fred:GS10, fred:WGS10YR, fred:IRLTLT01USM156N",
+        "xfail": false
+      },
+      {
+        "case_id": "curve-inverted",
+        "passed": true,
+        "stage": null,
+        "reason": null,
+        "xfail": false
+      },
+      {
+        "case_id": "mortgage-minus-ten-year",
+        "passed": false,
+        "stage": "series",
+        "reason": "the measure subtracted from: picked fred:T10Y2Y (0.05), acceptable fred:MORTGAGE30US, fred:OBMMIC30YF",
+        "xfail": false
+      },
+      {
+        "case_id": "fed-leads-mortgages",
+        "passed": true,
+        "stage": null,
+        "reason": null,
+        "xfail": false
+      },
+      {
+        "case_id": "breakevens",
+        "passed": false,
+        "stage": "series",
+        "reason": "the first measure: picked fred:DFII10 (0.25), acceptable fred:T10YIE, fred:T10YIEM",
+        "xfail": false
+      },
+      {
+        "case_id": "oil-and-gasoline",
+        "passed": true,
+        "stage": null,
+        "reason": null,
+        "xfail": false
+      },
+      {
+        "case_id": "gold-versus-dollar",
+        "passed": false,
+        "stage": "series",
+        "reason": "the first measure: picked fred:NASDAQXAU (0.16), acceptable fred:NASDAQQGLDI",
+        "xfail": false
+      },
+      {
+        "case_id": "sp500-in-gold",
+        "passed": true,
+        "stage": null,
+        "reason": null,
+        "xfail": false
+      },
+      {
+        "case_id": "nasdaq-vs-sp500",
+        "passed": false,
+        "stage": "shape",
+        "reason": "chose compare (0.98), expected ratio (0.02)",
+        "xfail": false
+      },
+      {
+        "case_id": "real-oil-price",
+        "passed": false,
+        "stage": "shape",
+        "reason": "chose level (0.99), expected ratio (0.01)",
+        "xfail": false
+      },
+      {
+        "case_id": "yen-move",
+        "passed": true,
+        "stage": null,
+        "reason": null,
+        "xfail": false
+      },
+      {
+        "case_id": "crude-leads-gasoline-cpi",
+        "passed": false,
+        "stage": "series",
+        "reason": "the measure that moves first: picked fred:CUSR0000SETB01 (0.16), acceptable fred:DCOILWTICO, fred:DCOILBRENTEU, fred:WTISPLC, fred:MCOILWTICO, fred:WCOILWTICO, fred:WPU0561",
+        "xfail": false
+      },
+      {
+        "case_id": "coffee-pass-through",
+        "passed": true,
+        "stage": null,
+        "reason": null,
+        "xfail": false
+      },
+      {
+        "case_id": "home-prices-lead-shelter",
+        "passed": false,
+        "stage": "series",
+        "reason": "the measure that moves first: picked fred:CUSR0000SEHC (0.13), acceptable fred:CSUSHPINSA, fred:CSUSHPISA, fred:SPCS20RSA, fred:SPCS20RNSA, fred:SPCS10RSA, fred:USSTHPI, fred:HPIPONM226S",
+        "xfail": false
+      },
+      {
+        "case_id": "wages-and-inflation",
+        "passed": true,
+        "stage": null,
+        "reason": null,
+        "xfail": false
+      },
+      {
+        "case_id": "gold-spot",
+        "passed": true,
+        "stage": null,
+        "reason": null,
+        "xfail": true
+      },
+      {
+        "case_id": "fed-expectations",
+        "passed": false,
+        "stage": "series",
+        "reason": "the measure: picked fred:FEDTARMD (0.12), acceptable fred:DGS1, fred:GS1, fred:DTB1YR, fred:TB1YR",
+        "xfail": true
+      },
+      {
+        "case_id": "gasoline-crack-spread",
+        "passed": false,
+        "stage": "series",
+        "reason": "the measure subtracted from: picked fred:DCOILWTICO (0.49), acceptable fred:DGASNYH, fred:DGASUSGULF",
+        "xfail": true
+      }
+    ]
+  ],
+  "chooser": "jev"
+}

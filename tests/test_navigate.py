@@ -119,6 +119,57 @@ def test_beam_follows_clear_choices_to_a_leaf_and_ranks_its_series(catalog):
     assert result.series[0]["concept_id"] == "prices.commodities.energy"
 
 
+class RecordingJev(ScriptedJev):
+    """ScriptedJev that also records the state of every call."""
+
+    def __init__(self, answers):
+        super().__init__(answers)
+        self.states: list[dict] = []
+        self.questions: list[str] = []
+
+    def choice(self, state, instructions, criteria):
+        self.states.append(state)
+        self.questions.append(instructions)
+        return super().choice(state, instructions, criteria)
+
+
+CRUDE = {
+    TOP: {"prices": 0.9},
+    PRICES: {"commodities": 0.95},
+    COMMODITIES: {"energy": 0.85},
+    ENERGY_SERIES: {"fred:DCOILWTICO": 0.8},
+}
+
+
+def test_a_role_rides_in_the_text_of_every_decision(catalog):
+    jev = RecordingJev(CRUDE)
+    role = "the measure that moves first"
+    result = navigate("does crude lead gasoline?", catalog, jev, role=role)
+    assert result.series[0]["series_id"] == "DCOILWTICO"
+    assert (
+        jev.states
+        == [
+            {
+                "query": "does crude lead gasoline? (Find only the measure that moves first.)",
+                "find": role,
+            }
+        ]
+        * 4
+    )
+    assert jev.questions[0] == (
+        "Which area of the economy holds the measure that moves first in this request?"
+    )
+    assert jev.questions[-1] == (
+        "Which data series is the measure that moves first in this request?"
+    )
+
+
+def test_without_a_role_the_state_is_only_the_query(catalog):
+    jev = RecordingJev(CRUDE)
+    navigate("crude oil", catalog, jev)
+    assert jev.states == [{"query": "crude oil"}] * 4
+
+
 def test_beam_keeps_two_routes_when_the_choice_is_split(catalog):
     jev = ScriptedJev(
         {

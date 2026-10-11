@@ -140,7 +140,9 @@ def _safe_ratio(num: pl.Expr, den: pl.Expr) -> pl.Expr:
 
 
 def _resample(x: Series, freq: str, agg: str) -> Series:
-    if x.freq == freq:
+    # Weekly series end on different weekdays (mortgage rates on Thursday), so "W" always
+    # re-anchors to the week's start; otherwise two weekly series never share a date.
+    if x.freq == freq and freq != "W":
         return x
     if x.freq != "irregular" and FREQ_ORDER[freq] < FREQ_ORDER[x.freq]:
         raise EvalError(f"resample can only make a series coarser ({x.freq} → {freq} is finer)")
