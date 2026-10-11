@@ -49,6 +49,10 @@ Tailscale, agents in `tmux`), follow [docs/HOMEBASE.md](docs/HOMEBASE.md):
 
 ```sh
 tempus db init | status            # schema / health
+tempus db where                    # dev, or prod read-only (TEMPUS_DB=prod)
+tempus db pull                     # prod's data → dev (--series, --concept, --metadata-only)
+tempus db push [--yes]             # dev's newer syncs + Jev placements → prod (dry run without --yes)
+tempus db readonly-role            # on the home base: the read-only tempus_ro role
 tempus fred search "mortgage rate" # find series
 tempus catalog add fred MORTGAGE30US --sync
 tempus catalog list | remove fred GDP
