@@ -90,11 +90,18 @@ def _at(name: str, freq: str, target: str) -> str:
     return name if freq == target else f'resample({name}, "{target}", "mean")'
 
 
+def _pair_at(names: tuple[str, str], freqs: tuple[str, str], target: str) -> tuple[str, str]:
+    """Both series at `target`. Weekly series end on different weekdays, so when the pair
+    meets at weekly, both are resampled onto one anchor."""
+    if target == "W" and freqs[0] != freqs[1]:
+        return tuple(f'resample({n}, "W", "mean")' for n in names)  # type: ignore[return-value]
+    return _at(names[0], freqs[0], target), _at(names[1], freqs[1], target)
+
+
 def _aligned(names: tuple[str, str], rows: tuple[dict, dict]) -> tuple[str, str]:
     """Both series at the coarser frequency, so arithmetic can line them up."""
     freqs = (_freq(rows[0]), _freq(rows[1]))
-    target = _coarsest(*freqs)
-    return _at(names[0], freqs[0], target), _at(names[1], freqs[1], target)
+    return _pair_at(names, freqs, _coarsest(*freqs))
 
 
 def _card(question: str, title: str, inputs: dict[str, Input], formulas, panels) -> Card:
@@ -180,9 +187,10 @@ def _lead_lag(question: str, picks: list[Pick], meta: Meta, chooser: Chooser) ->
     leader, follower = _inputs(picks, meta)
     freqs = (_freq(leader[1]), _freq(follower[1]))
     at = _yearly(_coarsest(*freqs))
+    leader_at, follower_at = _pair_at(("leader", "follower"), freqs, at)
     formulas = {
-        "leader_yoy": f"yoy({_at('leader', freqs[0], at)})",
-        "follower_yoy": f"yoy({_at('follower', freqs[1], at)})",
+        "leader_yoy": f"yoy({leader_at})",
+        "follower_yoy": f"yoy({follower_at})",
         "correlation": "lagcorr(leader_yoy, follower_yoy, nlags=12)",
     }
     panels = [
@@ -241,7 +249,10 @@ SHAPES: dict[str, Shape] = {
         Shape(
             "spread",
             "Asks for the gap between two measures in the same units: one minus the other.",
-            ("the measure subtracted from", "the measure subtracted"),
+            (
+                "the first leg of the gap: one rate or price, not a ready-made spread",
+                "the second leg of the gap: one rate or price, not a ready-made spread",
+            ),
             True,
             _spread,
         ),

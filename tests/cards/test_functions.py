@@ -125,3 +125,13 @@ def test_match_args_and_signature():
     with pytest.raises(ArgError, match="too many"):
         match_args(f, ["x", "M", "mean", 1], {})
     assert signature(f) == 'resample(x, freq, agg="mean")'
+
+
+def test_resample_to_weekly_lines_up_a_thursday_weekly_with_a_daily():
+    # Mortgage rates are weekly on Thursdays; a daily series resampled to "W" lands on Mondays.
+    thursdays = series("w", "W", [(date(2024, 1, 4), 6.6), (date(2024, 1, 11), 6.7)])
+    daily = series("d", "D", [(date(2024, 1, d), 4.0) for d in range(1, 15)])
+    w, d = fn("resample", thursdays, "W"), fn("resample", daily, "W")
+    assert w.df["ts"].to_list() == [date(2024, 1, 1), date(2024, 1, 8)]
+    assert w.df["ts"].to_list() == d.df["ts"].to_list()
+    assert values(w) == [6.6, 6.7]

@@ -162,6 +162,18 @@ def test_ratio_divides_with_the_finer_series_resampled():
     }
 
 
+MORTGAGE = {"title": "30-Year Mortgage Rate", "units": "Percent", "frequency": "Weekly, Ending Thursday",
+            "observation_start": "1971-04-02"}  # fmt: skip
+TEN_YEAR = {"title": "10-Year Treasury", "units": "Percent", "frequency": "Daily",
+            "observation_start": "1962-01-02"}  # fmt: skip
+
+
+def test_spread_of_a_weekly_and_a_daily_resamples_both_to_one_weekly_anchor():
+    META.update({"fred:MORTGAGE30US": MORTGAGE, "fred:DGS10": TEN_YEAR})
+    card = build("spread", "fred:MORTGAGE30US", "fred:DGS10")
+    assert card.formulas == {"spread": 'resample(a, "W", "mean") - resample(b, "W", "mean")'}
+
+
 def test_lead_lag_mirrors_crude_to_gasoline():
     assert body(build("lead_lag", "fred:DCOILWTICO", "fred:CUSR0000SETB01")) == {
         "title": "Crude Oil WTI → CPI Gasoline",
