@@ -110,9 +110,17 @@ class Navigation:
 
 
 def navigate(
-    query: str, catalog: Catalog, chooser: Chooser, *, beam: int = BEAM, label: str = ""
+    query: str,
+    catalog: Catalog,
+    chooser: Chooser,
+    *,
+    role: str | None = None,
+    beam: int = BEAM,
+    label: str = "",
 ) -> Navigation:
-    state = {"query": query}
+    """With `role`, find only the series that plays that part in the query (e.g. "the measure
+    that moves first" in "does crude lead gasoline?"); every decision sees it as `find`."""
+    state = {"query": query} | ({"find": role} if role else {})
     frontier = [Path()]
     done: list[Path] = []
     while frontier:
@@ -146,17 +154,18 @@ def navigate(
         frontier = sorted(grown, key=lambda p: -p.score)[:beam]
     paths = sorted(done, key=lambda p: -p.score)[:beam]
     return Navigation(
-        query, label or type(chooser).__name__, paths, _rank_series(query, catalog, chooser, paths)
+        query, label or type(chooser).__name__, paths, _rank_series(state, catalog, chooser, paths)
     )
 
 
-def _rank_series(query: str, catalog: Catalog, chooser: Chooser, paths: list[Path]) -> list[dict]:
+def _rank_series(state: dict, catalog: Catalog, chooser: Chooser, paths: list[Path]) -> list[dict]:
     """Rank the series under each reached concept, best route first.
 
     Each route gets its own menu, so series compete with their neighbors rather than with
     another route's; `score` (route score x series probability) is reported for comparison.
     Popularity breaks near-ties, e.g. UNRATE over the same title for a single state.
     """
+    query = state["query"]
     out: list[dict] = []
     seen: set[str] = set()
     for rank, path in enumerate(paths):
@@ -176,7 +185,7 @@ def _rank_series(query: str, catalog: Catalog, chooser: Chooser, paths: list[Pat
         criteria = {ref: series_text(candidates[ref]) for ref in menu}
         criteria[NONE] = "None of these series is what the request asks for."
         probs = chooser.choice(
-            {"query": query}, "Which data series is the one this request asks for?", criteria
+            state, "Which data series is the one this request asks for?", criteria
         ).probabilities
         ranked = [
             candidates[ref]
