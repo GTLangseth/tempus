@@ -14,3 +14,4 @@ node_modules/
 .claude/skills/
 skills-lock.json
 .claude/settings.local.json
+.claude/worktrees/
