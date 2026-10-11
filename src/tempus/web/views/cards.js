@@ -1,6 +1,7 @@
 // The cards view: concept tree with the cards filed in it, and one card at a time.
 // Hot-reloads over /api/events (wired in app.js). Layout follows docs/DESIGN.md.
 import { fmt, renderPanel } from "../adapters/echarts.js";
+import { keepCard } from "../api.js";
 import { esc, FREQ } from "../util.js";
 
 const LAG_SHORT = { D: "d", W: "wk", M: "mo", Q: "qtr", Y: "yr" };
@@ -36,6 +37,19 @@ export function lendLagFreq(payloads) {
 export function errorBlock(errors) {
   return errors.length ? `<div class="errors"><span class="label">${errors.length} error${errors.length > 1 ? "s" : ""}</span>\n${
     errors.map((e) => `${esc(e.path)}\n  ${esc(e.message)}${e.hint ? " " + esc(e.hint) : ""}`).join("\n\n")}</div>` : "";
+}
+
+// Keep a drafted card and open it. Refusals show above the view's `.actions` row; `busy`
+// locks the view's controls meanwhile, and `stale` says the view moved on while it waited.
+export async function keepAndOpen(root, card, busy, stale) {
+  busy(true, "Keeping…");
+  const kept = await keepCard(card);
+  if (stale()) return;
+  if (kept.id) { location.hash = `#/cards/${encodeURIComponent(kept.id)}`; return; }
+  busy(false, kept.message);
+  root.querySelector(".keep-errors")?.remove();
+  if (kept.errors.length) root.querySelector(".actions").insertAdjacentHTML("beforebegin",
+    `<div class="keep-errors">${errorBlock(kept.errors)}</div>`);
 }
 
 export function statRow(stats) {

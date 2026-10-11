@@ -1,8 +1,10 @@
-// The tempus app: a hash router over four views. Explore (the default) is the 3D concept
+// The tempus app: a hash router over five views. Explore (the default) is the 3D concept
 // tree with natural-language search; series pages show one series; drafts turn a question
-// into a card; cards hot-reload over /api/events. Layout and tokens follow docs/DESIGN.md
-// (Neon Notebook).
+// into a card; compare lines up hand-picked series; cards hot-reload over /api/events.
+// Layout and tokens follow docs/DESIGN.md (Neon Notebook).
+import { mountCompare, refreshTray } from "./compare.js";
 import { CardsView } from "./views/cards.js";
+import { CompareView } from "./views/compare.js";
 import { DraftView } from "./views/draft.js";
 import { ExploreView } from "./views/explore.js";
 import { SeriesView } from "./views/series.js";
@@ -27,11 +29,14 @@ if (meta.remote) {
   document.querySelector("header .brand").after(badge);
 }
 
-const VIEWS = { explore: ExploreView, series: SeriesView, cards: CardsView, draft: DraftView };
+const VIEWS = { explore: ExploreView, series: SeriesView, cards: CardsView, draft: DraftView, compare: CompareView };
 const outlet = document.getElementById("view");
 let active = null; // {kind, view}
 
 export function parse(hash) {
+  // Refs are encoded one by one and joined by commas, so split before decoding.
+  const compare = hash.match(/^#\/?compare\/(.*)$/);
+  if (compare) return { kind: "compare", refs: compare[1].split(",").filter(Boolean).map(decodeURIComponent) };
   const parts = hash.replace(/^#\/?/, "").split("/").map(decodeURIComponent);
   switch (parts[0]) {
     case "series": return { kind: "series", source: parts[1], id: parts.slice(2).join("/") };
@@ -46,8 +51,9 @@ export function parse(hash) {
 async function route() {
   const r = parse(location.hash);
   document.querySelectorAll("header nav a").forEach((a) =>
-    a.classList.toggle("active", a.dataset.view === (r.kind === "series" || r.kind === "draft" ? "explore" : r.kind)));
+    a.classList.toggle("active", a.dataset.view === (["series", "draft", "compare"].includes(r.kind) ? "explore" : r.kind)));
   document.body.dataset.view = r.kind;
+  refreshTray();
   if (active?.kind === r.kind) return active.view.update(r);
   active?.view.unmount();
   if (r.kind !== "series") document.title = "tempus";
@@ -56,6 +62,7 @@ async function route() {
   await view.mount(r);
 }
 
+mountCompare();
 window.addEventListener("hashchange", route);
 const events = new EventSource("/api/events");
 for (const kind of ["card-changed", "card-invalid", "card-removed"]) {

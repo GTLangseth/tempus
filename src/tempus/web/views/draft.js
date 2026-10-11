@@ -1,9 +1,9 @@
 // The draft view (#/draft/<question>): Jev drafts a card for a question, the user swaps any
 // pick for a runner-up, then keeps it (cards/<id>.yaml) or discards it. Phase 2 addendum of
 // docs/specs/2026-10-05-question-to-card-design.md. Layout follows docs/DESIGN.md.
-import { failure, keepCard, post, READ_ONLY } from "../api.js";
+import { failure, post, READ_ONLY } from "../api.js";
 import { esc, FREQ } from "../util.js";
-import { drawPanels, errorBlock, headlineStats, lendLagFreq, statRow } from "./cards.js";
+import { drawPanels, errorBlock, headlineStats, keepAndOpen, lendLagFreq, statRow } from "./cards.js";
 
 const SHAPE_WORDS = {
   level: "where it stands",
@@ -167,13 +167,6 @@ export class DraftView {
 
   async keep() {
     const seq = this.seq;
-    this.busy(true, "Keeping…");
-    const kept = await keepCard(this.draft.card);
-    if (seq !== this.seq) return;
-    if (kept.id) { location.hash = `#/cards/${encodeURIComponent(kept.id)}`; return; }
-    this.busy(false, kept.message);
-    this.root.querySelector(".keep-errors")?.remove();
-    if (kept.errors.length) this.root.querySelector(".actions").insertAdjacentHTML("beforebegin",
-      `<div class="keep-errors">${errorBlock(kept.errors)}</div>`);
+    await keepAndOpen(this.root, this.draft.card, (on, message) => this.busy(on, message), () => seq !== this.seq);
   }
 }
