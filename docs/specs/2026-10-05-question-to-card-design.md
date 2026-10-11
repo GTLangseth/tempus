@@ -307,3 +307,38 @@ Errors: an empty question is 422. With no `TYPESAFE_API_KEY`, drafting uses the 
 - the rendered panels (`drawPanels`), a collapsible block with the YAML, and **Keep** and **Discard**.
 
 Keep posts the card and goes to `#/cards/<id>`. Discard goes back to explore. While Jev works (a few seconds), the view shows progress. A `DraftError` shows its reason next to the dropdowns, so swapping a series can fix it. The layout follows `docs/DESIGN.md` and works at phone width.
+
+### Compare several series (added to phase 2, 2026-10-11)
+
+The user asked to pick several series by hand and see how they move together, with no question
+and no Jev. Defaults chosen and reported to the user:
+
+- **Selecting.** Every series row in explore (search results and tree lists) and the series
+  page get a **+ Compare** toggle. A tray pinned to the bottom shows the picks as chips, holds
+  2 to 6 series, persists in `localStorage`, and offers **Compare** and **Clear**.
+- **The view.** `#/compare/<ref>,<ref>,…` shows all the series on one timeseries panel, with a
+  switch between `rebased` (to 100 at the latest common start, never before 2000-01-01),
+  `yoy` (each at monthly or coarser, as `change` does) and `zscore`. The default is `rebased`
+  when units differ and the plain levels (`levels`) when they all match. Under the chart sits a
+  correlation matrix of their year-over-year changes, at a common monthly frequency over the
+  window they share, with the number of months it covers. **Keep** saves the card through
+  `POST /api/cards`.
+- **The card** is a plain v1 card with N inputs (`s1` … `sN`, labelled with titles), the
+  transform's formulas and one timeseries panel, `tags: [compare]`, and a question such as
+  "How do A, B and C move together?". The matrix is shown only and never saved, so the card
+  language stays the same.
+
+```text
+POST /api/compare   {"series": [ref, ...2..6], "mode": "levels" | "rebased" | "yoy" | "zscore" | null}
+  → 200 {
+    "series": [{"series": ref, "title": str|null, "units": str|null, "frequency": str|null}],
+    "mode": str,                       # the mode used (the default when null was sent)
+    "modes": [str],                    # the modes that make sense ("levels" only when units match)
+    "card": <card spec as JSON>, "yaml": str,
+    "payloads": [...], "errors": [...],
+    "correlation": {"refs": [ref...], "matrix": [[float|null]...], "months": int, "start": str|null, "end": str|null}
+  }
+  → 422 fewer than 2 or more than 6 series, duplicates, or an unknown ref
+```
+
+Guest and read-only apps may compare, since it reads only, but Keep stays refused for guests.
