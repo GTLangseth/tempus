@@ -151,7 +151,10 @@ cases:
 ```
 
 Each entry under `roles` lists the acceptable series for one role, in the shape's role
-order. `also` lists other shapes that count as correct. The set covers every shape at least
+order. `also` lists other shapes that count as correct. `xfail: <reason>` marks a question
+tempus can't answer well yet (for example, no gold spot price in the snapshot). It is graded
+like any other but reported separately, so a new source or function shows up as a measured
+gain. The set includes two or three of these. The set covers every shape at least
 twice, holds at least eight multi-series questions and three compound phrasings ("oil
 price and gasoline"), and starts from the user's own habits: the release calendar, rates
 and the curve, market prices, inflation and its pass-through. `mise run lint` validates the
@@ -177,10 +180,10 @@ so a baseline can be committed and later runs compared against it.
 
 ## One-way doors
 
-- **The eval file format.** It becomes the regression suite, so later drafters are judged
+- **The eval file format** (approved 2026-10-11, with `xfail`). It becomes the regression suite, so later drafters are judged
   against it. To reverse it, convert about 25 cases with a script, which is cheap now and
   grows with every case. `version: 1` keeps that path open.
-- **The shape names.** They appear in the eval file, in `tempus card draft` output, and
+- **The shape names** (kept as written, 2026-10-11). They appear in the eval file, in `tempus card draft` output, and
   later in the UI and the MCP server. They never enter card files, so renaming one touches
   only the registry and the eval file.
 
@@ -217,10 +220,7 @@ The write path from `tempus serve` to `cards/` waits for the phase 2 addendum.
 
 ## Open questions
 
-- **A streak function.** "Is the curve inverted, and for how long?" needs a function that
-  counts how long a condition has held. It would be an additive catalog change. Add it in
-  this work or leave it to SPA-41 (watches), which needs the same idea?
+- **A streak function.** Decided 2026-10-11: left to SPA-41 (watches), which needs the
+  same idea. `threshold` cards show the current state only.
 - **The phase 2 bar.** The user sets it after seeing the baseline.
-- **Series the snapshot lacks.** The FRED snapshot has no gold spot price, only NASDAQ gold
-  indexes. Should the eval include questions tempus can't answer well yet, graded as
-  expected failures, so a later source shows up as a gain?
+- **Series the snapshot lacks.** Decided 2026-10-11: yes, two or three `xfail` cases.
