@@ -109,6 +109,21 @@ cd ~/tempus && claude                   # real DB, real keys, real Jev
 Close the app whenever you like; `tmux` keeps the session running. Reattach later with the
 same two commands. Use cloud routines instead for code-only work that doesn't need real data.
 
+## Develop on the mini from Zed
+
+From the MacBook, in the repo:
+
+```sh
+mise run homebase:zed                   # opens the mini's checkout in Zed over SSH
+```
+
+Zed runs its editor on the MacBook and its language servers, terminal and file access on the
+mini, so builds and tests hit the real database. The task finds the checkout at `~/tempus` or
+`~/Projects/tempus`, using the `homebase` SSH alias (`~/.ssh/config`). To use a different host
+or folder, set `TEMPUS_HOMEBASE_HOST` and `TEMPUS_HOMEBASE_DIR`. This checkout is the one
+launchd serves, so keep it on `main` when you're done and restart the app after a pull
+(see [Day to day](#day-to-day)).
+
 ## Use the mini's database from the MacBook
 
 ```sh
