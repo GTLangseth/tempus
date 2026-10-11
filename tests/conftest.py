@@ -22,16 +22,43 @@ def no_api_keys(monkeypatch):
     monkeypatch.setenv("FRED_API_KEY", "")
 
 
-@pytest.fixture
-def conn():
+@pytest.fixture(autouse=True)
+def dev_database(monkeypatch):
+    """Tests never open a tunnel to the home base, whatever the developer's shell says."""
+    monkeypatch.setenv("TEMPUS_DB", "dev")
+
+
+def fresh_database(name: str) -> str:
+    """Drop and recreate `name` next to the dev database; returns its URL."""
     url = get_settings().database_url
     try:
         admin = psycopg.connect(url, autocommit=True, connect_timeout=2)
     except psycopg.OperationalError:
         pytest.skip("database not reachable")
     with admin:
-        admin.execute(f"DROP DATABASE IF EXISTS {TEST_DB} WITH (FORCE)")
-        admin.execute(f"CREATE DATABASE {TEST_DB}")
-    with db.connect(make_conninfo(url, dbname=TEST_DB)) as c:
+        admin.execute(f"DROP DATABASE IF EXISTS {name} WITH (FORCE)")
+        admin.execute(f"CREATE DATABASE {name}")
+    return make_conninfo(url, dbname=name)
+
+
+def _schema_conn(name: str):
+    with db.connect(fresh_database(name)) as c:
         db.init_schema(c)
         yield c
+
+
+@pytest.fixture
+def conn():
+    yield from _schema_conn(TEST_DB)
+
+
+@pytest.fixture
+def dev_conn():
+    """The dev side of a pull or push (`tempus_test_dev`)."""
+    yield from _schema_conn("tempus_test_dev")
+
+
+@pytest.fixture
+def prod_conn():
+    """The prod side of a pull or push (`tempus_test_prod`)."""
+    yield from _schema_conn("tempus_test_prod")
