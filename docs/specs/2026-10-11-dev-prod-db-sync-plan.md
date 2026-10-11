@@ -40,7 +40,8 @@ pydantic-settings, FastAPI, plain ES modules. OpenSSH (system). No new dependenc
 **Clarifications of the spec** (record them in the spec's "Changes during implementation"
 in Task 14):
 
-- Only `auto` placements (Jev filings) move in either direction. `manual` pins and `draft`
+- Series metadata and observations (the FRED backfill) always move whole. Of the placements,
+  only `auto` ones (Jev placements) move in either direction. `manual` pins and `draft`
   placements come from git (`catalog.toml`, `ontology/placements.draft.yaml`) on each side;
   pushing them would ping-pong, since every `ontology load` refreshes a draft's `filed_at`.
 - The read-only role is created by a new `tempus db readonly-role` command (testable), which
@@ -1745,7 +1746,7 @@ def _print_plan(plan: transfer.PushPlan) -> None:
         for e in plan.entries:
             table.add_row(
                 _key(e.key), e.data or "—", str(e.observations) if e.data else "—",
-                "Jev filing" if e.placement else "—",
+                "Jev placement" if e.placement else "—",
             )  # fmt: skip
         console.print(table)
     if plan.prod_ahead:
@@ -1755,7 +1756,7 @@ def _print_plan(plan: transfer.PushPlan) -> None:
         )
     if plan.skipped_placements:
         console.print(
-            "[yellow]Filings skipped, their concepts aren't on prod yet:[/yellow] "
+            "[yellow]Jev placements skipped, their concepts aren't on prod yet:[/yellow] "
             + ", ".join(map(_key, plan.skipped_placements))
         )
 ```
@@ -1793,7 +1794,7 @@ def db_pull(
             _print_plan(exc.plan)
             console.print(f"[red]{exc}[/red]")
             raise typer.Exit(1) from exc
-    rows = ", ".join(f"{n} {table.replace('series_concepts', 'filings')}" for table, n in result.rows.items())
+    rows = ", ".join(f"{n} {table.replace('series_concepts', 'Jev placements')}" for table, n in result.rows.items())
     console.print(f"[green]Pulled {rows}[/green] in {time.monotonic() - started:.1f}s")
     if result.missing:
         console.print(
@@ -1801,7 +1802,7 @@ def db_pull(
         )
     if result.skipped_placements:
         console.print(
-            f"[yellow]{result.skipped_placements} filings skipped:[/yellow] "
+            f"[yellow]{result.skipped_placements} Jev placements skipped:[/yellow] "
             "their concepts aren't in this branch's ontology"
         )
 ```
@@ -2007,7 +2008,7 @@ def test_push_yes_applies_the_plan(linked):
     add_series(dev, "A")
     result = runner.invoke(app, ["db", "push", "--yes"])
     assert result.exit_code == 0, result.output
-    assert "Pushed 1 series (3 observations), 0 filings" in result.output
+    assert "Pushed 1 series (3 observations), 0 Jev placements" in result.output
     assert prod.execute("SELECT count(*) AS n FROM observations").fetchone()["n"] == 3
 
 
@@ -2049,7 +2050,7 @@ def db_push(
         result = transfer.apply_push(dev, prod, plan)
     console.print(
         f"[green]Pushed {result.series} series ({result.observations} observations), "
-        f"{result.placements} filings[/green]"
+        f"{result.placements} Jev placements[/green]"
     )
 ```
 
