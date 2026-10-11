@@ -19,7 +19,7 @@ dependencies = [
 ]
 
 [project.scripts]
-tempus = "tempus.cli:app"
+tempus = "tempus.cli:main"
 
 [dependency-groups]
 dev = [

@@ -1,13 +1,16 @@
+import functools
 import re
 import time
+from contextlib import contextmanager
 from datetime import datetime
 from pathlib import Path
 
+import psycopg
 import typer
 from rich.console import Console
 from rich.table import Table
 
-from tempus import catalog, db, ontology, remote
+from tempus import catalog, db, ontology, remote, transfer
 from tempus.config import Settings, get_settings
 from tempus.filing import file_series
 from tempus.jev import JevClient, JevError
@@ -93,10 +96,102 @@ def _parse_interval(text: str) -> int:
     return int(n) * {"s": 1, "m": 60, "h": 3600, "d": 86400}[unit]
 
 
+READ_ONLY = (
+    "TEMPUS_DB=prod is read-only: run this on the home base (ssh homebase), or unset TEMPUS_DB."
+)
+
+
+def writes(fn):
+    """Mark a command that writes: it refuses in prod mode, before any tunnel opens."""
+
+    @functools.wraps(fn)
+    def wrapper(*args, **kwargs):
+        if Settings().db == "prod":
+            console.print(f"[red]{READ_ONLY}[/red]")
+            raise typer.Exit(1)
+        return fn(*args, **kwargs)
+
+    return wrapper
+
+
+def _parse_keys(value: str | None) -> list[transfer.Key] | None:
+    if value is None:
+        return None
+    keys = []
+    for part in value.split(","):
+        source, sep, series_id = part.strip().partition(":")
+        if not sep or not source or not series_id:
+            raise typer.BadParameter(f"'{part.strip()}': use source:series_id, e.g. fred:UNRATE")
+        keys.append((source, series_id))
+    return keys
+
+
+@contextmanager
+def _prod(owner: bool):
+    """(settings, dev, prod) for pull and push: dev must be local; prod through a tunnel,
+    as tempus_ro or (owner=True) as the owner."""
+    settings = Settings()
+    if not remote.is_local(settings.database_url):
+        console.print(
+            "[red]DATABASE_URL isn't local:[/red] pull and push only write to a dev database "
+            "on this machine."
+        )
+        raise typer.Exit(1)
+    setting = "TEMPUS_PROD_PASSWORD" if owner else "TEMPUS_PROD_RO_PASSWORD"
+    try:
+        remote.prod_url(settings, 0, owner=owner)  # a missing password fails before ssh
+        with (
+            remote.Tunnel(settings.homebase_host, settings.prod_db_port) as tunnel,
+            db.connect(settings.database_url) as dev,
+        ):
+            try:
+                prod = db.connect(remote.prod_url(settings, tunnel.local_port, owner=owner))
+            except psycopg.OperationalError as exc:
+                why = str(exc).strip().splitlines()[-1]
+                console.print(
+                    f"[red]Can't connect to prod:[/red] {why}\nCheck {setting} and "
+                    f"TEMPUS_PROD_DB_PORT ({settings.prod_db_port}) in .env."
+                )
+                raise typer.Exit(1) from exc
+            with prod:
+                yield settings, dev, prod
+    except (remote.RemoteError, transfer.TransferError) as exc:
+        console.print(f"[red]{exc}[/red]")
+        raise typer.Exit(1) from exc
+
+
+def _key(key: transfer.Key) -> str:
+    return f"{key[0]}:{key[1]}"
+
+
+def _print_plan(plan: transfer.PushPlan) -> None:
+    if plan.entries:
+        table = Table("series", "data", "observations", "placement")
+        for e in plan.entries:
+            table.add_row(
+                _key(e.key),
+                e.data or "—",
+                str(e.observations) if e.data else "—",
+                "Jev placement" if e.placement else "—",
+            )
+        console.print(table)
+    if plan.prod_ahead:
+        console.print(
+            f"[yellow]Prod is ahead for {len(plan.prod_ahead)} series (pull them):[/yellow] "
+            + ", ".join(map(_key, plan.prod_ahead))
+        )
+    if plan.skipped_placements:
+        console.print(
+            "[yellow]Jev placements skipped, their concepts aren't on prod yet:[/yellow] "
+            + ", ".join(map(_key, plan.skipped_placements))
+        )
+
+
 # --- db --------------------------------------------------------------------
 
 
 @db_app.command("init")
+@writes
 def db_init():
     """Create the extension, tables, and hypertable (idempotent)."""
     with _connect() as conn:
@@ -129,6 +224,7 @@ def db_where():
 
 
 @db_app.command("readonly-role")
+@writes
 def db_readonly_role():
     """Create or update the read-only tempus_ro role (on the home base; idempotent).
 
@@ -147,6 +243,82 @@ def db_readonly_role():
     console.print(f"[green]{remote.RO_ROLE} ready[/green]: read-only, SELECT on every table")
 
 
+@db_app.command("pull")
+@writes
+def db_pull(
+    series: str | None = typer.Option(None, help="Only these, e.g. fred:UNRATE,fred:CPIAUCSL"),
+    concept: str | None = typer.Option(None, help="Only series placed at or under this concept"),
+    metadata_only: bool = typer.Option(False, "--metadata-only", help="No observations"),
+    discard_local: bool = typer.Option(
+        False, "--discard-local", help="Overwrite dev's unpushed syncs and Jev placements"
+    ),
+):
+    """Copy prod's series, observations and Jev placements into the dev database."""
+    from tempus.cards.repository import sync_index
+
+    started = time.monotonic()
+    with _prod(owner=False) as (settings, dev, prod):
+        keys = transfer.select_keys(prod, _parse_keys(series), concept)
+
+        def prepare(conn):
+            _load_ontology(conn, settings, quiet=True)
+            sync_index(conn, _cards())
+
+        try:
+            result = transfer.pull(
+                dev,
+                prod,
+                keys,
+                metadata_only=metadata_only,
+                discard_local=discard_local,
+                prepare=prepare,
+            )
+        except transfer.UnpushedWork as exc:
+            _print_plan(exc.plan)
+            console.print(f"[red]{exc}[/red]")
+            raise typer.Exit(1) from exc
+    names = {"series_concepts": "Jev placements"}
+    rows = ", ".join(f"{n} {names.get(t, t)}" for t, n in result.rows.items())
+    console.print(f"[green]Pulled {rows}[/green] in {time.monotonic() - started:.1f}s")
+    if result.missing:
+        console.print(
+            "[yellow]Not on prod (dev's copy kept):[/yellow] "
+            + ", ".join(map(_key, result.missing))
+        )
+    if result.skipped_placements:
+        console.print(
+            f"[yellow]{result.skipped_placements} Jev placements skipped:[/yellow] "
+            "their concepts aren't in this branch's ontology"
+        )
+
+
+@db_app.command("push")
+@writes
+def db_push(
+    series: str | None = typer.Option(None, help="Only these, e.g. fred:UNRATE,fred:CPIAUCSL"),
+    concept: str | None = typer.Option(None, help="Only series placed at or under this concept"),
+    yes: bool = typer.Option(False, "--yes", help="Apply the plan (default: only show it)"),
+):
+    """Send series dev synced more recently, and Jev placements, to prod. Never deletes."""
+    with _prod(owner=True) as (_settings, dev, prod):
+        keys = transfer.select_keys(dev, _parse_keys(series), concept)
+        plan = transfer.plan_push(dev, prod, keys)
+        _print_plan(plan)
+        if not plan:
+            console.print("Nothing to push.")
+            return
+        if not yes:
+            console.print(
+                "Dry run: nothing written. Run [bold]tempus db push --yes[/bold] to push."
+            )
+            return
+        result = transfer.apply_push(dev, prod, plan)
+    console.print(
+        f"[green]Pushed {result.series} series ({result.observations} observations), "
+        f"{result.placements} Jev placements[/green]"
+    )
+
+
 # --- catalog ---------------------------------------------------------------
 
 
@@ -161,6 +333,7 @@ def catalog_list():
 
 
 @catalog_app.command("add")
+@writes
 def catalog_add(
     source: str = typer.Argument(..., help=f"One of: {', '.join(SOURCE_NAMES)}"),
     series_ids: list[str] = typer.Argument(..., help="One or more series IDs"),
@@ -182,6 +355,7 @@ def catalog_add(
 
 
 @catalog_app.command("import-snapshot")
+@writes
 def catalog_import_snapshot(
     path: Path = typer.Argument(..., help="e.g. data/fred/series-snapshot.json"),
     source: str = typer.Option("fred"),
@@ -205,6 +379,7 @@ def catalog_import_snapshot(
 
 
 @catalog_app.command("remove")
+@writes
 def catalog_remove(source: str, series_id: str):
     """Remove a series from catalog.toml (stored data is kept; see `series delete`)."""
     if catalog.remove(get_settings().catalog_path, source, series_id):
@@ -223,6 +398,7 @@ def _print_result(r) -> None:
 
 
 @app.command()
+@writes
 def sync(
     source: str | None = typer.Option(None, help="Only sync this source"),
     series: list[str] | None = typer.Option(None, "--series", "-s", help="Only these IDs"),
@@ -341,6 +517,7 @@ def series_show(
 
 
 @series_app.command("delete")
+@writes
 def series_delete(series_id: str, source: str = typer.Option("fred")):
     """Delete a series and all its observations from the database."""
     with _connect() as conn:
@@ -429,6 +606,7 @@ def _load_ontology(conn, settings, *, quiet: bool = False) -> list[ontology.Conc
 
 
 @ontology_app.command("load")
+@writes
 def ontology_load():
     """Validate ontology/concepts.yaml, catalog pins and draft placements, and load them.
 
@@ -440,6 +618,7 @@ def ontology_load():
 
 
 @ontology_app.command("file")
+@writes
 def ontology_file(
     refile: bool = typer.Option(False, help="Re-decide existing auto placements too"),
 ):
@@ -715,6 +894,7 @@ def card_show(
 
 
 @card_app.command("load")
+@writes
 def card_load():
     """Sync cards/*.yaml into the cards index table."""
     from tempus.cards.repository import sync_index
@@ -794,3 +974,16 @@ def serve(
         raise typer.Exit(1) from exc
     console.print(f"tempus (shared, password-gated) → [bold]http://{host}:{port}[/bold]")
     uvicorn.run(app_, host=host, port=port, log_level="warning", proxy_headers=False)
+
+
+def main() -> None:
+    """The `tempus` entry point: `app`, plus one-line messages for prod-mode errors any
+    command can hit (prod unreachable; a write that slipped past `writes`)."""
+    try:
+        app()
+    except remote.RemoteError as exc:
+        console.print(f"[red]{exc}[/red]")
+        raise SystemExit(1) from exc
+    except psycopg.errors.ReadOnlySqlTransaction as exc:
+        console.print(f"[red]{READ_ONLY}[/red]")
+        raise SystemExit(1) from exc
