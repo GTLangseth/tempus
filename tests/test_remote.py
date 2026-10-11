@@ -1,4 +1,7 @@
+import os
+import signal
 import stat
+import subprocess
 import sys
 import time
 from pathlib import Path
@@ -142,3 +145,36 @@ def test_read_only_settings_points_at_the_tunnel(monkeypatch):
     s = remote.read_only_settings(Settings(_env_file=None, db="prod", prod_ro_password="ro"))
     info = conninfo_to_dict(s.database_url)
     assert (info["port"], info["user"]) == ("6123", "tempus_ro") and s.db == "prod"
+
+
+# Holds a process-wide tunnel like `TEMPUS_DB=prod tempus serve`, prints ssh's pid, waits.
+HOLDER = """\
+import sys, time
+from tempus import remote
+t = remote._hold(remote.Tunnel("homebase", 5432, ssh=sys.argv[1], keepalive=True))
+print(t._proc.pid, flush=True)
+time.sleep(60)
+"""
+
+
+def _alive(pid: int) -> bool:
+    try:
+        os.kill(pid, 0)
+    except ProcessLookupError:
+        return False
+    return True
+
+
+@pytest.mark.parametrize("sig", [signal.SIGTERM, signal.SIGINT])
+def test_a_held_tunnel_closes_when_the_process_is_signalled(fake_ssh, sig):
+    holder = subprocess.Popen(
+        [sys.executable, "-c", HOLDER, fake_ssh], stdout=subprocess.PIPE, text=True
+    )
+    ssh_pid = int(holder.stdout.readline())
+    assert _alive(ssh_pid)
+    holder.send_signal(sig)
+    holder.wait(timeout=10)
+    deadline = time.monotonic() + 5
+    while _alive(ssh_pid) and time.monotonic() < deadline:
+        time.sleep(0.1)
+    assert not _alive(ssh_pid), f"ssh outlived its process after {sig.name}"

@@ -5,8 +5,10 @@ only transport: nothing listens on the network on either machine.
 """
 
 import atexit
+import signal
 import socket
 import subprocess
+import sys
 import threading
 import time
 
@@ -150,6 +152,21 @@ def is_local(url: str) -> bool:
 _tunnel: Tunnel | None = None
 
 
+def _hold(tunnel: Tunnel) -> Tunnel:
+    """Start `tunnel` and keep it for the life of the process, closing it at exit.
+
+    SIGTERM (launchd, `kill`) would skip atexit: uvicorn re-raises it after shutting down,
+    and the default action kills the process outright, orphaning ssh. Unless something
+    else already handles SIGTERM, turn it into a normal exit so atexit runs.
+    """
+    tunnel.start()
+    atexit.register(tunnel.stop)
+    main = threading.current_thread() is threading.main_thread()
+    if main and signal.getsignal(signal.SIGTERM) is signal.SIG_DFL:
+        signal.signal(signal.SIGTERM, lambda signum, frame: sys.exit(128 + signum))
+    return tunnel
+
+
 def read_only_settings(settings: Settings) -> Settings:
     """`settings` pointed at prod through a process-wide tunnel, as tempus_ro.
 
@@ -159,6 +176,5 @@ def read_only_settings(settings: Settings) -> Settings:
     global _tunnel
     prod_url(settings, 0)  # raises RemoteError naming the setting
     if _tunnel is None:
-        _tunnel = Tunnel(settings.homebase_host, settings.prod_db_port, keepalive=True).start()
-        atexit.register(_tunnel.stop)
+        _tunnel = _hold(Tunnel(settings.homebase_host, settings.prod_db_port, keepalive=True))
     return settings.model_copy(update={"database_url": prod_url(settings, _tunnel.local_port)})

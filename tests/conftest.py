@@ -27,8 +27,17 @@ def no_api_keys(monkeypatch):
 
 @pytest.fixture(autouse=True)
 def dev_database(monkeypatch):
-    """Tests never open a tunnel to the home base, whatever the developer's shell says."""
+    """Tests never open a tunnel to the home base, whatever the developer's shell or .env
+    says (mise loads .env into the environment)."""
     monkeypatch.setenv("TEMPUS_DB", "dev")
+    for name in (
+        "TEMPUS_HOMEBASE_HOST",
+        "TEMPUS_PROD_DB_PORT",
+        "TEMPUS_PROD_RO_PASSWORD",
+        "TEMPUS_PROD_PASSWORD",
+        "TEMPUS_DB_RO_PASSWORD",
+    ):
+        monkeypatch.delenv(name, raising=False)
 
 
 def fresh_database(name: str) -> str:
