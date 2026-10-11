@@ -133,6 +133,14 @@ mise run db:up
 mise exec -- uv run tempus db init
 ok "database ready"
 
+step "Read-only database role for the MacBook (tempus_ro)"
+if ! grep -Eq '^TEMPUS_DB_RO_PASSWORD=.+' .env; then
+  sed -i '' '/^TEMPUS_DB_RO_PASSWORD=/d' .env
+  echo "TEMPUS_DB_RO_PASSWORD=$(openssl rand -hex 16)" >> .env
+fi
+mise exec -- uv run tempus db readonly-role
+todo "On the MacBook, add to .env: TEMPUS_PROD_RO_PASSWORD=$(sed -n 's/^TEMPUS_DB_RO_PASSWORD=//p' .env) and TEMPUS_PROD_DB_PORT=$DB_PORT; for db push also TEMPUS_PROD_PASSWORD (the password in this Mac's DATABASE_URL)"
+
 UV="$(mise which uv)"
 ENV_PATH="$(dirname "$UV"):$BREW_PREFIX/bin:/usr/bin:/bin:/usr/sbin:/sbin"
 mkdir -p "$AGENTS" "$LOGS"

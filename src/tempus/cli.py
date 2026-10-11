@@ -7,8 +7,8 @@ import typer
 from rich.console import Console
 from rich.table import Table
 
-from tempus import catalog, db, ontology
-from tempus.config import get_settings
+from tempus import catalog, db, ontology, remote
+from tempus.config import Settings, get_settings
 from tempus.filing import file_series
 from tempus.jev import JevClient, JevError
 from tempus.sources import SOURCE_NAMES, get_source
@@ -40,10 +40,20 @@ SPARK = "▁▂▃▄▅▆▇█"
 
 def _connect():
     try:
-        return db.connect(get_settings().database_url)
+        settings = get_settings()
+    except remote.RemoteError as exc:
+        console.print(f"[red]{exc}[/red]")
+        raise typer.Exit(1) from exc
+    try:
+        return db.connect(settings.database_url)
     except Exception as exc:
         console.print(f"[red]Could not connect to the database:[/red] {exc}")
-        console.print("Is it running? Try [bold]mise run db:up[/bold]")
+        if settings.db == "prod":
+            console.print(
+                "Is the home base's database up? Try [bold]mise run homebase:status[/bold] there"
+            )
+        else:
+            console.print("Is it running? Try [bold]mise run db:up[/bold]")
         raise typer.Exit(1) from exc
 
 
@@ -101,6 +111,40 @@ def db_status():
         info = db.status(conn)
     for key, value in info.items():
         console.print(f"[bold]{key:>13}[/bold]  {_fmt(value)}")
+
+
+@db_app.command("where")
+def db_where():
+    """Which database this shell uses: dev, or prod read-only (TEMPUS_DB=prod)."""
+    with _connect() as conn:
+        info = db.status(conn)
+        user = conn.execute("SELECT current_user AS u").fetchone()["u"]
+        host, port = conn.info.host, conn.info.port  # as connected, defaults filled in
+    settings = Settings()
+    mode = f"prod via {settings.homebase_host} (read-only)" if settings.db == "prod" else "dev"
+    console.print(
+        f"[bold]{mode}[/bold]  {user}@{host}:{port}/"
+        f"{info['database']}  timescaledb {info['timescaledb']}, {info['series']} series"
+    )
+
+
+@db_app.command("readonly-role")
+def db_readonly_role():
+    """Create or update the read-only tempus_ro role (on the home base; idempotent).
+
+    Its password is TEMPUS_DB_RO_PASSWORD. Copy it to the MacBook's .env as
+    TEMPUS_PROD_RO_PASSWORD.
+    """
+    settings = get_settings()
+    if not settings.db_ro_password:
+        console.print(
+            "[red]Set TEMPUS_DB_RO_PASSWORD in .env first[/red] "
+            "([bold]mise run homebase:setup[/bold] generates one)."
+        )
+        raise typer.Exit(1)
+    with _connect() as conn:
+        db.ensure_readonly_role(conn, settings.db_ro_password, role=remote.RO_ROLE)
+    console.print(f"[green]{remote.RO_ROLE} ready[/green]: read-only, SELECT on every table")
 
 
 # --- catalog ---------------------------------------------------------------
