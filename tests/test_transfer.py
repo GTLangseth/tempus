@@ -1,12 +1,14 @@
 # tests/test_transfer.py
 from datetime import UTC, datetime, timedelta
 
+import psycopg
 import pytest
 
 from tempus import transfer
 from tempus.transfer import (
     SchemaMismatch,
     UnpushedWork,
+    apply_push,
     copy_rows,
     plan_push,
     pull,
@@ -282,3 +284,59 @@ def test_failed_pull_leaves_dev_untouched(dev_conn, prod_conn):
     with pytest.raises(RuntimeError):
         pull(dev_conn, prod_conn, prepare=boom)
     assert series_ids(dev_conn) == ["OLD"]
+
+
+def test_push_replaces_prod_s_copy_of_a_newer_series(dev_conn, prod_conn):
+    add_series(prod_conn, "A", upstream=T0, points=5)  # stale, with points since revised away
+    add_series(dev_conn, "A", upstream=LATER, points=3, values_from=10)
+    result = apply_push(dev_conn, prod_conn, plan_push(dev_conn, prod_conn))
+    assert (result.series, result.observations) == (1, 3)
+    assert obs(prod_conn, "A") == obs(dev_conn, "A")
+    row = prod_conn.execute(
+        "SELECT upstream_updated_at FROM series WHERE series_id = 'A'"
+    ).fetchone()
+    assert row["upstream_updated_at"] == LATER
+    run = prod_conn.execute("SELECT status, rows_upserted, finished_at FROM sync_runs").fetchone()
+    assert run["status"] == "pushed" and run["rows_upserted"] == 3 and run["finished_at"]
+
+
+def test_push_adds_new_series_and_never_deletes_others(dev_conn, prod_conn):
+    add_series(prod_conn, "PRODONLY")
+    add_series(dev_conn, "NEW")
+    apply_push(dev_conn, prod_conn, plan_push(dev_conn, prod_conn))
+    assert series_ids(prod_conn) == ["NEW", "PRODONLY"] and len(obs(prod_conn, "PRODONLY")) == 3
+
+
+def test_push_ships_a_jev_filing_over_a_draft(dev_conn, prod_conn):
+    for conn in (dev_conn, prod_conn):
+        add_concept(conn, "labor")
+        add_concept(conn, "prices")
+        add_series(conn, "A", upstream=None, synced=None, points=0)
+    place(prod_conn, "A", "prices", "draft")
+    place(dev_conn, "A", "labor", "auto", LATER)
+    result = apply_push(dev_conn, prod_conn, plan_push(dev_conn, prod_conn))
+    assert (result.series, result.placements) == (0, 1)
+    row = prod_conn.execute("SELECT concept_id, method FROM series_concepts").fetchone()
+    assert (row["concept_id"], row["method"]) == ("labor", "auto")
+    assert prod_conn.execute("SELECT count(*) AS n FROM sync_runs").fetchone()["n"] == 0
+
+
+def test_push_then_pull_leaves_nothing_to_push(dev_conn, prod_conn):
+    for conn in (dev_conn, prod_conn):
+        add_concept(conn, "labor")
+    add_series(dev_conn, "A", upstream=LATER)
+    place(dev_conn, "A", "labor", "auto", LATER)
+    apply_push(dev_conn, prod_conn, plan_push(dev_conn, prod_conn))
+    assert not plan_push(dev_conn, prod_conn)  # pushing twice sends nothing
+    pull(dev_conn, prod_conn, prepare=lambda c: add_concept(c, "labor"))
+    assert not plan_push(dev_conn, prod_conn)  # and a pull doesn't create work
+
+
+def test_failed_push_rolls_back(dev_conn, prod_conn):
+    add_series(dev_conn, "A", upstream=LATER)
+    add_series(prod_conn, "A", upstream=T0, values_from=5)
+    plan = plan_push(dev_conn, prod_conn)
+    prod_conn.execute("ALTER TABLE sync_runs ADD CONSTRAINT no_push CHECK (status <> 'pushed')")
+    with pytest.raises(psycopg.errors.CheckViolation):
+        apply_push(dev_conn, prod_conn, plan)
+    assert obs(prod_conn, "A")[0][1] == 5

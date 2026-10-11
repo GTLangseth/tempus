@@ -314,3 +314,63 @@ def pull(
             """
         ).fetchone()["n"]
     return PullResult(rows, skipped, missing)
+
+
+@dataclass(frozen=True)
+class PushResult:
+    series: int
+    observations: int
+    placements: int
+
+
+def apply_push(dev: psycopg.Connection, prod: psycopg.Connection, plan: PushPlan) -> PushResult:
+    """Apply `plan` to prod in one transaction. Each series in it is replaced whole (its row
+    and all its observations); nothing else in prod is deleted. Pushed series log a
+    `sync_runs` row with status `pushed`."""
+    data_keys = [e.key for e in plan.entries if e.data]
+    placement_keys = [e.key for e in plan.entries if e.placement]
+    series_cols = shared_columns(dev, prod, "series")
+    obs_cols = shared_columns(dev, prod, "observations")
+    placement_cols = shared_columns(dev, prod, "series_concepts")
+    observations = 0
+    with prod.transaction():
+        w, p = _where([e.key for e in plan.entries])
+        # A scheduled sync on the mini touching these series waits for this transaction.
+        prod.execute(sql.SQL("SELECT 1 FROM series WHERE {w} FOR UPDATE").format(w=w), p)
+        if data_keys:
+            w, p = _where(data_keys)
+            cols = sql.SQL(", ").join(map(sql.Identifier, series_cols))
+            prod.execute(
+                "CREATE TEMP TABLE _push_series (LIKE series INCLUDING DEFAULTS) ON COMMIT DROP"
+            )
+            copy_rows(dev, prod, "series", series_cols, w, p, into="_push_series")
+            prod.execute(
+                sql.SQL(
+                    "INSERT INTO series ({cols}) SELECT {cols} FROM _push_series"
+                    " ON CONFLICT (source, series_id) DO UPDATE SET {sets}"
+                ).format(cols=cols, sets=_set_clause(series_cols))
+            )
+            prod.execute(sql.SQL("DELETE FROM observations WHERE {w}").format(w=w), p)
+            observations = copy_rows(dev, prod, "observations", obs_cols, w, p)
+            counts = _observation_counts(prod, data_keys)
+            with prod.cursor() as cur:
+                cur.executemany(
+                    "INSERT INTO sync_runs (source, series_id, finished_at, status, rows_upserted)"
+                    " VALUES (%s, %s, now(), 'pushed', %s)",
+                    [(s, i, counts.get((s, i), 0)) for s, i in data_keys],
+                )
+        if placement_keys:
+            w, p = _where(placement_keys)
+            cols = sql.SQL(", ").join(map(sql.Identifier, placement_cols))
+            prod.execute(
+                "CREATE TEMP TABLE _push_placements"
+                " (LIKE series_concepts INCLUDING DEFAULTS) ON COMMIT DROP"
+            )
+            copy_rows(dev, prod, "series_concepts", placement_cols, w, p, into="_push_placements")
+            prod.execute(
+                sql.SQL(
+                    "INSERT INTO series_concepts ({cols}) SELECT {cols} FROM _push_placements"
+                    " ON CONFLICT (source, series_id) DO UPDATE SET {sets}"
+                ).format(cols=cols, sets=_set_clause(placement_cols))
+            )
+    return PushResult(len(data_keys), observations, len(placement_keys))
