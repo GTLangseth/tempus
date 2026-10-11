@@ -13,6 +13,16 @@ for (const [k, v] of Object.entries(theme.rounded)) root.setProperty(`--rounded-
 root.setProperty("--grid-cell", `${theme.grid}px`);
 await document.fonts.ready; // so charts measure text in the real fonts
 
+// Reading prod through the tunnel (TEMPUS_DB=prod): say so on every page.
+const meta = await fetch("/api/meta").then((r) => (r.ok ? r.json() : {})).catch(() => ({}));
+if (meta.remote) {
+  const badge = document.createElement("span");
+  badge.className = "chip remote-badge";
+  badge.textContent = "prod · read-only";
+  badge.title = "The home base's database, through an SSH tunnel. Nothing here can change it.";
+  document.querySelector("header .brand").after(badge);
+}
+
 const VIEWS = { explore: ExploreView, series: SeriesView, cards: CardsView };
 const outlet = document.getElementById("view");
 let active = null; // {kind, view}
