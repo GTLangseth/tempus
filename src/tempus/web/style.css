@@ -68,6 +68,8 @@ a.chip:hover { border-color: var(--ink); }
   vertical-align: 0.18em; border: 1.5px solid var(--ink);
 }
 .chip .dot { width: 8px; height: 8px; border-width: 1px; vertical-align: 0; }
+/* TEMPUS_DB=prod: the header says which database you're looking at. */
+.remote-badge { border-color: var(--ink); color: var(--ink); }
 .foot { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
 
 /* --- explore -------------------------------------------------------------------------- */
@@ -259,6 +261,7 @@ th { color: var(--pencil); font-weight: 500; text-transform: uppercase; letter-s
   #sidebar { position: static; height: auto; border-right: 0; border-bottom: 1px solid var(--hairline); }
   #main, main.feed { padding: 24px 16px 48px; }
   .question { font-size: 28px; }
+  header:has(.remote-badge) { gap: 12px; } /* brand, badge and nav fit 390px with gutters */
   .explore { height: auto; overflow: visible; display: grid; gap: 16px; padding: 16px; }
   .explore .ask, .explore .side, .explore .corner, .explore[data-mode] .stage {
     position: static; transform: none; width: auto; left: auto; top: auto; bottom: auto;

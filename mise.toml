@@ -73,6 +73,10 @@ run = "bash scripts/homebase/setup.sh"
 description = "Home base health: tailnet, serve, Remote Login, Colima, DB, launchd agents"
 run = "bash scripts/homebase/status.sh"
 
+[tasks."homebase:zed"]
+description = "Open the home base's checkout in Zed over SSH via Tailscale (TEMPUS_HOMEBASE_HOST, TEMPUS_HOMEBASE_DIR)"
+run = "bash scripts/homebase/zed.sh"
+
 [tasks."share:on"]
 description = "Share the app outside the tailnet: password-gated, read-only, via Funnel on :8443; off after 8h (-- --for 2h|none, --new-password)"
 run = "bash scripts/homebase/share.sh on"

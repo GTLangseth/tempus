@@ -16,21 +16,19 @@ the Linear issue's description is the design.
 ## Flow
 
 1. **Issue first.** Work starts from a Linear issue.
-2. **Spec on a branch.** Name the branch `spec/<topic>`, *without* the issue ID, and write
-   `Refs SPA-25` in the PR body. Linear closes an issue when a PR whose branch carries the
-   issue ID merges, and approving a spec shouldn't close the work. Name the file
-   `YYYY-MM-DD-<topic>-design.md`. Its header lists status and the Linear issue; the issue
-   links back to the spec.
-3. **Review as a PR.** Merging the spec PR means the spec is approved.
-4. **Plan, then sub-issues.** The implementation plan sits next to the spec
-   (`YYYY-MM-DD-<topic>-plan.md`). Each group of plan tasks becomes a Linear sub-issue.
-5. **Implementation PRs** use the sub-issue's Linear branch name, so merging closes that
-   sub-issue. The last one applies the spec's
-   "Docs to update" section and sets the spec's status to **Implemented**.
-6. **Drift.** If implementation departs from the spec, add a short "Changes during
+2. **One branch, one PR.** The spec, its implementation plan and the code all land on the
+   issue's Linear branch, in a single PR; merging it closes the issue. Name the spec
+   `YYYY-MM-DD-<topic>-design.md` and the plan `YYYY-MM-DD-<topic>-plan.md`. The spec's
+   header lists status and the Linear issue; the issue links back to the PR.
+3. **Agree the design before coding.** Talk the design through (in chat or as an early
+   draft commit on the branch) until it's settled, then write the plan and build. Large
+   plans can fan out across parallel agents; no separate PRs or sub-issues per task group.
+4. **Before merging,** apply the spec's "Docs to update" section and set its status to
+   **Implemented**.
+5. **Drift.** If implementation departs from the spec, add a short "Changes during
    implementation" note to the spec and a decision entry in `ARCHITECTURE.md`. Don't
    silently edit the original design.
 
 ## Statuses
 
-`Draft` → `Approved` (merged) → `Implemented`, or `Superseded by <spec>`.
+`Draft` → `Implemented` (merged with its code), or `Superseded by <spec>`.
