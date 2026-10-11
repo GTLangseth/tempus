@@ -125,9 +125,11 @@ class RecordingJev(ScriptedJev):
     def __init__(self, answers):
         super().__init__(answers)
         self.states: list[dict] = []
+        self.questions: list[str] = []
 
     def choice(self, state, instructions, criteria):
         self.states.append(state)
+        self.questions.append(instructions)
         return super().choice(state, instructions, criteria)
 
 
@@ -139,15 +141,26 @@ CRUDE = {
 }
 
 
-def test_a_role_rides_in_every_state_of_the_walk_and_the_series_ranking(catalog):
+def test_a_role_rides_in_the_text_of_every_decision(catalog):
     jev = RecordingJev(CRUDE)
-    result = navigate(
-        "does crude lead gasoline?", catalog, jev, role="the measure that moves first"
-    )
+    role = "the measure that moves first"
+    result = navigate("does crude lead gasoline?", catalog, jev, role=role)
     assert result.series[0]["series_id"] == "DCOILWTICO"
     assert (
         jev.states
-        == [{"query": "does crude lead gasoline?", "find": "the measure that moves first"}] * 4
+        == [
+            {
+                "query": "does crude lead gasoline? (Find only the measure that moves first.)",
+                "find": role,
+            }
+        ]
+        * 4
+    )
+    assert jev.questions[0] == (
+        "Which area of the economy holds the measure that moves first in this request?"
+    )
+    assert jev.questions[-1] == (
+        "Which data series is the measure that moves first in this request?"
     )
 
 

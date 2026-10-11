@@ -340,7 +340,10 @@ def test_drafter_picks_a_series_per_role_skipping_one_already_taken(conn):
     }
     assert draft.card.notes.startswith("Drafted as lead_lag (p 0.80).\n")
     assert run_spec(conn, "drafted", draft.card).errors == []
-    assert {"query": "Does the leader lead the follower?", "find": FOLLOWER} in jev.states
+    assert {
+        "query": "Does the leader lead the follower? (Find only the measure that responds later.)",
+        "find": FOLLOWER,
+    } in jev.states
 
 
 def _snapshot_series(conn, series_id: str, units: str, concept: str = "prices.energy"):
