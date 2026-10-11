@@ -1,9 +1,16 @@
+from datetime import UTC, datetime
+
 import pytest
 
 from tempus.cards.check import check_card
+from tempus.cards.run import run_spec
 from tempus.cards.spec import load_card
-from tempus.drafting import SHAPES, DraftError, Pick, assemble, card_yaml
+from tempus.drafting import SHAPES, DraftError, JevDrafter, Pick, assemble, card_yaml
+from tempus.filing import NONE
 from tempus.jev import ChoiceAnswer
+from tempus.sources.base import Observation, SeriesMeta
+
+from .cards.seed import seed
 
 WTI = {"title": "Crude Oil WTI", "units": "Dollars per Barrel", "frequency": "Daily",
        "observation_start": "1986-01-02"}  # fmt: skip
@@ -261,3 +268,144 @@ def test_card_yaml_loads_back_as_the_same_card(tmp_path, shape, refs):
     path = tmp_path / "drafted.yaml"
     path.write_text(card_yaml(card))
     assert load_card(path) == (card, [])
+
+
+# --- the drafter, end to end on seeded data ------------------------------------------------
+
+
+class ScriptedJev:
+    """Answers from a dict keyed by (the role being found, the menu's option set)."""
+
+    def __init__(self, answers: dict[tuple[str | None, frozenset], dict[str, float]]):
+        self.answers = answers
+        self.states: list[dict] = []
+
+    def choice(self, state, instructions, criteria):
+        self.states.append(state)
+        default = {NONE: 1.0} if NONE in criteria else {}
+        found = self.answers.get((state.get("find"), frozenset(criteria)), default)
+        probs = {k: 0.0 for k in criteria} | found
+        return ChoiceAnswer(max(probs, key=probs.get), probs)
+
+
+LEADER, FOLLOWER = SHAPES["lead_lag"].roles
+TOP = frozenset({"prices", NONE})
+PRICES = frozenset({"energy", "empty", NONE})
+ENERGY = frozenset({"fred:XLEAD", "fred:SNAP", NONE})
+
+
+def shape_menu(**probs: float) -> dict:
+    return {(None, frozenset(SHAPES)): probs}
+
+
+def test_drafter_picks_a_series_per_role_skipping_one_already_taken(conn):
+    seed(conn)
+    jev = ScriptedJev(
+        shape_menu(lead_lag=0.8, compare=0.15)
+        | {
+            (LEADER, TOP): {"prices": 0.9},
+            (LEADER, PRICES): {"energy": 0.8},
+            (LEADER, frozenset({"fred:XLEAD", NONE})): {"fred:XLEAD": 0.9},
+            (FOLLOWER, TOP): {"prices": 0.9},
+            (FOLLOWER, PRICES): {NONE: 0.7},
+            (FOLLOWER, frozenset({"fred:XLEAD", "fred:YFOLLOW", NONE})): {
+                "fred:XLEAD": 0.6,
+                "fred:YFOLLOW": 0.3,
+            },
+        }
+    )
+    draft = JevDrafter(conn, jev).draft("Does the leader lead the follower?")
+
+    assert draft.shape.choice == "lead_lag" and draft.shape.probabilities["compare"] == 0.15
+    assert draft.picks == [
+        Pick(LEADER, "fred:XLEAD", 0.9, []),
+        Pick(FOLLOWER, "fred:YFOLLOW", 0.3, []),
+    ]
+    assert draft.error is None and draft.synced == []
+    assert body(draft.card) == {
+        "title": "Leader → Follower",
+        "inputs": {
+            "leader": {"series": "fred:XLEAD", "label": "Leader"},
+            "follower": {"series": "fred:YFOLLOW", "label": "Follower"},
+        },
+        "formulas": {
+            "leader_yoy": "yoy(leader)",
+            "follower_yoy": "yoy(follower)",
+            "correlation": "lagcorr(leader_yoy, follower_yoy, nlags=12)",
+        },
+        "panels": [
+            {"type": "timeseries", "title": "YoY change", "y": ["leader_yoy", "follower_yoy"]},
+            {"type": "lagcorr", "data": "correlation"},
+        ],
+    }
+    assert draft.card.notes.startswith("Drafted as lead_lag (p 0.80).\n")
+    assert run_spec(conn, "drafted", draft.card).errors == []
+    assert {"query": "Does the leader lead the follower?", "find": FOLLOWER} in jev.states
+
+
+def _snapshot_series(conn, series_id: str, units: str, concept: str = "prices.energy"):
+    conn.execute(
+        """INSERT INTO series (source, series_id, title, units, frequency, extra)
+           VALUES ('fred', %s, %s, %s, 'Monthly', '{"observation_start": "2010-01-01"}')""",
+        (series_id, f"Snapshot {series_id}", units),
+    )
+    conn.execute(
+        """INSERT INTO series_concepts (source, series_id, concept_id, method)
+           VALUES ('fred', %s, %s, 'auto')""",
+        (series_id, concept),
+    )
+
+
+class _Fred:
+    name = "fred"
+
+    def fetch_meta(self, series_id):
+        stamp = datetime(2026, 10, 1, tzinfo=UTC)
+        return SeriesMeta(series_id, title=f"Synced {series_id}", units="Percent",
+                          frequency="Monthly", upstream_updated_at=stamp)  # fmt: skip
+
+    def fetch_observations(self, series_id):
+        return [Observation(datetime(2020, m, 1, tzinfo=UTC), 4.0 + m) for m in range(1, 13)]
+
+
+def test_drafter_syncs_a_picked_series_that_has_no_observations(conn):
+    seed(conn)
+    _snapshot_series(conn, "SNAP", "Percent")
+    jev = ScriptedJev(
+        shape_menu(level=0.9)
+        | {
+            ("the measure", TOP): {"prices": 0.9},
+            ("the measure", PRICES): {"energy": 0.8},
+            ("the measure", ENERGY): {"fred:SNAP": 0.7, "fred:XLEAD": 0.2},
+        }
+    )
+    draft = JevDrafter(conn, jev, sync_source=lambda name: _Fred()).draft("Where is snap?")
+    assert draft.synced == ["fred:SNAP"]
+    assert draft.picks == [Pick("the measure", "fred:SNAP", 0.7, [("fred:XLEAD", 0.2)])]
+    assert draft.card.inputs["x"].label == "Synced SNAP"
+    assert run_spec(conn, "drafted", draft.card).errors == []
+
+
+def test_drafter_reports_why_assembly_failed(conn):
+    seed(conn)
+    _snapshot_series(conn, "SNAP", "Percent")
+    first, second = SHAPES["spread"].roles
+    jev = ScriptedJev(
+        shape_menu(spread=0.9)
+        | {(role, TOP): {"prices": 0.9} for role in (first, second)}
+        | {(role, PRICES): {"energy": 0.8} for role in (first, second)}
+        | {(first, ENERGY): {"fred:XLEAD": 0.8}, (second, ENERGY): {"fred:SNAP": 0.8}}
+    )
+    draft = JevDrafter(conn, jev).draft("Leader minus snap?")
+    assert draft.card is None and draft.synced == []
+    assert draft.error == (
+        "a spread needs both series in the same units: Leader is in Index, "
+        "Snapshot SNAP is in Percent"
+    )
+
+
+def test_drafter_says_when_no_series_fills_a_role(conn):
+    seed(conn)
+    draft = JevDrafter(conn, ScriptedJev(shape_menu(level=0.9))).draft("bananas")
+    assert draft.picks == [] and draft.card is None
+    assert draft.error == "no series found for the measure"

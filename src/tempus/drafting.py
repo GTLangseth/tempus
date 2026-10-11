@@ -11,13 +11,18 @@ SHAPES is the only place that knows about shapes. A new shape is one entry here.
 
 from collections.abc import Callable
 from dataclasses import dataclass, field
+from typing import Protocol
 
+import psycopg
 import yaml
 
 from tempus.cards.spec import Card
 from tempus.cards.values import FREQ_ORDER, freq_from_fred
+from tempus.explore import SourceFactory, catalog_from_db
 from tempus.filing import Chooser
 from tempus.jev import ChoiceAnswer
+from tempus.navigate import navigate
+from tempus.sync import sync_series
 
 
 @dataclass(frozen=True)
@@ -272,6 +277,84 @@ def assemble(
     lines = [f"Drafted as {shape.name} (p {p:.2f})."]
     lines += [f"{pk.role}: {pk.series} (p {pk.probability:.2f})" for pk in picks]
     return card.model_copy(update={"notes": "\n".join(lines) + "\n"})
+
+
+# --- the drafter -------------------------------------------------------------------------
+
+SHAPE_QUESTION = "What kind of answer does this question ask for?"
+RUNNERS_UP = 4
+
+
+class Drafter(Protocol):
+    def draft(self, question: str) -> Draft: ...
+
+
+class JevDrafter:
+    """Jev decides every stage: the shape, then one `navigate` per role. Code builds the card."""
+
+    def __init__(
+        self,
+        conn: psycopg.Connection,
+        chooser: Chooser,
+        *,
+        sync_source: SourceFactory | None = None,
+    ):
+        self.conn, self.chooser, self.sync_source = conn, chooser, sync_source
+        self.catalog = catalog_from_db(conn)
+
+    def draft(self, question: str) -> Draft:
+        criteria = {name: s.describe for name, s in SHAPES.items()}
+        answer = self.chooser.choice({"query": question}, SHAPE_QUESTION, criteria)
+        shape = SHAPES[answer.choice]
+        picks: list[Pick] = []
+        for role in shape.roles:
+            pick = self._pick(question, role, {p.series for p in picks})
+            if pick is None:
+                return Draft(question, answer, picks, None, f"no series found for {role}")
+            picks.append(pick)
+        synced = [p.series for p in picks if self._sync(p.series)]
+        meta = {p.series: self._meta(p.series) for p in picks}
+        try:
+            card = assemble(
+                shape, answer.probabilities[shape.name], question, picks, meta, self.chooser
+            )
+        except DraftError as exc:
+            return Draft(question, answer, picks, None, str(exc), synced)
+        return Draft(question, answer, picks, card, None, synced)
+
+    def _pick(self, question: str, role: str, taken: set[str]) -> Pick | None:
+        found = navigate(question, self.catalog, self.chooser, role=role).series
+        ranked = [
+            (ref, s["p"]) for s in found if (ref := f"{s['source']}:{s['series_id']}") not in taken
+        ]
+        if not ranked:
+            return None
+        (ref, p), rest = ranked[0], ranked[1 : 1 + RUNNERS_UP]
+        return Pick(role, ref, p, rest)
+
+    def _sync(self, ref: str) -> bool:
+        """Sync a picked series that has no observations yet, as a series page does on open."""
+        source, series_id = ref.split(":", 1)
+        if self.sync_source is None or self._meta(ref)["observations"]:
+            return False
+        src = self.sync_source(source)
+        return src is not None and sync_series(self.conn, src, series_id).status != "failed"
+
+    def _meta(self, ref: str) -> dict:
+        source, series_id = ref.split(":", 1)
+        return self.conn.execute(
+            """
+            SELECT s.title, s.units, s.frequency,
+                   coalesce(s.extra->>'observation_start', o.first::date::text)
+                       AS observation_start,
+                   o.n AS observations
+            FROM series s,
+                 LATERAL (SELECT min(ts) AS first, count(*) AS n FROM observations
+                          WHERE source = s.source AND series_id = s.series_id) o
+            WHERE s.source = %s AND s.series_id = %s
+            """,
+            (source, series_id),
+        ).fetchone()
 
 
 # --- the card as a file ------------------------------------------------------------------
