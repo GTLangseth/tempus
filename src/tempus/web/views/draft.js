@@ -1,8 +1,9 @@
 // The draft view (#/draft/<question>): Jev drafts a card for a question, the user swaps any
 // pick for a runner-up, then keeps it (cards/<id>.yaml) or discards it. Phase 2 addendum of
 // docs/specs/2026-10-05-question-to-card-design.md. Layout follows docs/DESIGN.md.
+import { failure, post, READ_ONLY } from "../api.js";
 import { esc, FREQ } from "../util.js";
-import { drawPanels, errorBlock, headlineStats, lendLagFreq, statRow } from "./cards.js";
+import { drawPanels, errorBlock, headlineStats, keepAndOpen, lendLagFreq, statRow } from "./cards.js";
 
 const SHAPE_WORDS = {
   level: "where it stands",
@@ -18,29 +19,11 @@ const PROGRESS = [
   "Finding a series for each part of the answer…",
   "Building the card and running it…",
 ];
-const READ_ONLY = "This shared copy is read-only.";
 
 const shapeWords = (name) => SHAPE_WORDS[name] ?? name.replace(/_/g, " ");
 // Roles read like "the first leg of the gap: one rate or price, …"; the lead phrase is enough.
 const roleWords = (role) => role.split(/[,:]/)[0];
 const p2 = (p) => (p ?? 0).toFixed(2);
-
-// POST JSON; network failures come back as status 0 so callers handle one shape.
-async function post(url, body) {
-  try {
-    const res = await fetch(url, { method: "POST", headers: { "Content-Type": "application/json" },
-                                   body: JSON.stringify(body) });
-    return { status: res.status, body: await res.json().catch(() => null) };
-  } catch {
-    return { status: 0, body: null };
-  }
-}
-
-function failure(status, doing) {
-  if (status === 403) return READ_ONLY;
-  if (status === 0) return "Couldn't reach the app. Check it's still running, then try again.";
-  return `Something went wrong ${doing}. Try again.`;
-}
 
 export class DraftView {
   constructor(root, theme) {
@@ -184,19 +167,6 @@ export class DraftView {
 
   async keep() {
     const seq = this.seq;
-    this.busy(true, "Keeping…");
-    const { status, body } = await post("/api/cards", { card: this.draft.card });
-    if (seq !== this.seq) return;
-    if (status === 201 && body?.id) { location.hash = `#/cards/${encodeURIComponent(body.id)}`; return; }
-    this.busy(false, status === 400 ? "" : failure(status, "keeping the card"));
-    if (status === 400) {
-      // FastAPI puts the reasons in `detail`: a list of card errors, or one message.
-      const detail = body?.errors ?? body?.detail;
-      const errors = Array.isArray(detail) ? detail.map((e) => (typeof e === "string" ? { path: "card", message: e } : e))
-        : [{ path: "card", message: String(detail ?? "The card didn't pass its checks.") }];
-      this.root.querySelector(".keep-errors")?.remove();
-      this.root.querySelector(".actions").insertAdjacentHTML("beforebegin",
-        `<div class="keep-errors">${errorBlock(errors)}</div>`);
-    }
+    await keepAndOpen(this.root, this.draft.card, (on, message) => this.busy(on, message), () => seq !== this.seq);
   }
 }
