@@ -7,7 +7,7 @@ import typer
 from rich.console import Console
 from rich.table import Table
 
-from tempus import catalog, db, ontology
+from tempus import catalog, db, ontology, remote
 from tempus.config import get_settings
 from tempus.filing import file_series
 from tempus.jev import JevClient, JevError
@@ -101,6 +101,25 @@ def db_status():
         info = db.status(conn)
     for key, value in info.items():
         console.print(f"[bold]{key:>13}[/bold]  {_fmt(value)}")
+
+
+@db_app.command("readonly-role")
+def db_readonly_role():
+    """Create or update the read-only tempus_ro role (on the home base; idempotent).
+
+    Its password is TEMPUS_DB_RO_PASSWORD. Copy it to the MacBook's .env as
+    TEMPUS_PROD_RO_PASSWORD.
+    """
+    settings = get_settings()
+    if not settings.db_ro_password:
+        console.print(
+            "[red]Set TEMPUS_DB_RO_PASSWORD in .env first[/red] "
+            "([bold]mise run homebase:setup[/bold] generates one)."
+        )
+        raise typer.Exit(1)
+    with _connect() as conn:
+        db.ensure_readonly_role(conn, settings.db_ro_password, role=remote.RO_ROLE)
+    console.print(f"[green]{remote.RO_ROLE} ready[/green]: read-only, SELECT on every table")
 
 
 # --- catalog ---------------------------------------------------------------
