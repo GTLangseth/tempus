@@ -71,7 +71,13 @@ def compare_card(refs: list[str], meta: Meta, mode: str | None) -> Card:
         if suffix
         else {}
     )
+    titles = [row.get("title") or ref for ref, row in zip(refs, rows, strict=True)]
     short = [_short(row, ref) for ref, row in zip(refs, rows, strict=True)]
+    # FRED reuses a title across frequencies (DGS10, GS10): the id tells them apart.
+    for i, ref in enumerate(refs):
+        if titles.count(titles[i]) > 1:
+            series_id = ref.split(":", 1)[1]
+            titles[i], short[i] = f"{titles[i]} ({series_id})", f"{short[i]} ({series_id})"
     return Card.model_validate(
         {
             "version": 1,
@@ -79,8 +85,8 @@ def compare_card(refs: list[str], meta: Meta, mode: str | None) -> Card:
             "question": f"How do {_joined(short)} move together?",
             "tags": ["compare"],
             "inputs": {
-                n: {"series": ref, "label": row.get("title") or ref}
-                for n, ref, row in zip(names, refs, rows, strict=True)
+                n: {"series": ref, "label": title}
+                for n, ref, title in zip(names, refs, titles, strict=True)
             },
             "formulas": formulas,
             "panels": [{"type": "timeseries", "title": panel_title, "y": list(formulas) or names}],

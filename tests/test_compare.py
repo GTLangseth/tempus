@@ -303,3 +303,21 @@ def test_guest_and_read_only_apps_may_compare(conn, settings):
     for app in (create_app(settings, guest=True), create_app(settings, read_only=True)):
         response = TestClient(app).post("/api/compare", json={"series": ["fred:A", "fred:B"]})
         assert (response.status_code, response.json()["mode"]) == (200, "levels")
+
+
+def test_series_with_the_same_title_are_told_apart_by_id():
+    same = {"title": "Market Yield on U.S. Treasury Securities at 10-Year Constant Maturity",
+            "units": "Percent", "observation_start": "1962-01-02"}  # fmt: skip
+    meta = {
+        "fred:DGS10": same | {"frequency": "Daily"},
+        "fred:GS10": same | {"frequency": "Monthly"},
+    }
+    card = compare_card(["fred:DGS10", "fred:GS10"], meta, "levels")
+    assert [i.label for i in card.inputs.values()] == [
+        "Market Yield on U.S. Treasury Securities at 10-Year Constant Maturity (DGS10)",
+        "Market Yield on U.S. Treasury Securities at 10-Year Constant Maturity (GS10)",
+    ]
+    assert card.question == (
+        "How do Market Yield on U.S. Treasury Securities (DGS10) and "
+        "Market Yield on U.S. Treasury Securities (GS10) move together?"
+    )
