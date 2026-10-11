@@ -119,3 +119,10 @@ id = "CUSR0000SEFP01" # CPI: Coffee
 [[series]]
 source = "fred"
 id = "APU0000717311"  # Average Retail Price: Ground Coffee ($/lb)
+
+# --- Commodities: precious metals ----------------------------------------------
+
+[[series]]
+source = "fred"
+id = "NASDAQQGLDI"  # Credit Suisse NASDAQ Gold FLOWS103: tracks the gold price, not miners
+concept = "prices.commodities.metals"  # Jev filed it under equity indexes by its name

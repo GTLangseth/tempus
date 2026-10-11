@@ -35,7 +35,7 @@ and the quarterly review procedure live in [`STACK.md`](STACK.md).
 | Draft placements | 🟡 temporary | `ontology/placements.draft.yaml` | Claude-written homes for the snapshot series, loaded as method `draft`; replaced by Jev filing (see Decisions) |
 | Filing | ✅ built | `src/tempus/filing.py`, `src/tempus/jev.py` | Places series in the tree by walking it top-down with TypeSafe's Jev; pins in `catalog.toml` override; drafts are re-decided |
 | Navigation | ✅ built | `src/tempus/navigate.py` | Phrase → concepts → series by beam search down the tree (Jev, or a labeled lexical fallback with no key): `/api/navigate`, `tempus resolve` |
-| Drafting | 🟡 phase 1 (eval) | `src/tempus/drafting.py`, `src/tempus/grading.py`, `src/tempus/evals.py`, `evals/drafting.yaml` | Question → card: Jev chooses an answer shape (`SHAPES`), `navigate` fills each of its roles with a series, the shape's builder writes a plain v1 card. `tempus card draft "<question>"`; `--eval` grades every eval question by stage (shape, series, valid, renders) across runs |
+| Drafting | ✅ phase 1 (0.74 on the eval) | `src/tempus/drafting.py`, `src/tempus/grading.py`, `src/tempus/evals.py`, `evals/drafting.yaml` | Question → card: Jev chooses an answer shape (`SHAPES`), `navigate` fills each of its roles with a series, the shape's builder writes a plain v1 card. `tempus card draft "<question>"`; `--eval` grades every eval question by stage (shape, series, valid, renders) across runs |
 | CLI | ✅ built | `src/tempus/cli.py` | `tempus` commands for data actions: sync, catalog, inspect, search, resolve |
 | Repo tooling | ✅ built | `mise.toml` | Pins tools (Python, uv, Node) and runs repo tasks (setup, db, test, lint) |
 | Home base | 🟡 runbook ready | `docs/HOMEBASE.md`, `scripts/homebase/` | Mac mini on Tailscale: real DB and keys, `tempus serve` under launchd published with `tailscale serve`, SSH + tmux for agents from the phone (`mise run homebase:setup`); opt-in password-gated sharing via Funnel (`mise run share:on`) |
@@ -166,6 +166,14 @@ By the horizon in [`SOUL.md`](SOUL.md) where it first matters. Status: ✅ built
 
 Newest first. Each entry: what we chose, and why.
 
+- **2026-10-11 · Drafting cards from questions: the Jev drafter, tuned by an eval (SPA-43).**
+  Jev chooses an answer shape from a registry, `navigate` fills each role with the role in
+  the text Jev reads, and code builds a plain v1 card. Measured by `evals/drafting.yaml`
+  (28 questions, graded by stage over three runs): 0.39 as specified, 0.74 after tuning
+  (shape 1.00), which clears the 0.70 bar for the phase 2 button. Series picking is still
+  the limiting stage; the Claude-phrase drafter stays the next lever if it stalls. Also:
+  `resample(x, "W")` now re-anchors weekly series, so series ending on different weekdays
+  line up. Spec: `docs/specs/2026-10-05-question-to-card-design.md`.
 - **2026-10-11 · Dev and prod databases over SSH (SPA-46).** Develop against a dev database
   on the MacBook without re-running backfills or risking prod. Rows move with `COPY` through a
   short-lived `ssh -L` tunnel; push merges whole series on the provider's revision time and
