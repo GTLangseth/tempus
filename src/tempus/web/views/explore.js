@@ -1,6 +1,7 @@
 // The explore view: the concept tree in 3D (or an outline on small screens), with a search
 // box that walks the tree (/api/navigate) and flies the camera along the route it finds.
 import { ancestors, layout, subtree } from "../explore/layout.js";
+import { compareToggle } from "../compare.js";
 import { esc, fmtInt, FREQ } from "../util.js";
 
 const FREQ_KEYS = ["D", "W", "M", "Q", "Y"];
@@ -297,6 +298,8 @@ export class ExploreView {
     this.panel.innerHTML = `
       <div class="label">asked · ${fallback ? `<span class="flag">${esc(r.chooser)}</span>` : "jev"}</div>
       <h2 class="panel-title">${esc(r.query)}</h2>
+      <a class="draft-link" href="#/draft/${encodeURIComponent(r.query)}"
+        title="Draft a chart that answers it, ready to keep">Draft a card →</a>
       ${r.paths.length ? "" : `<p class="note">Nothing in the tree fits that. Try other words, or browse.</p>`}
       ${r.ambiguous ? `<p class="note"><b>Two readings.</b> The top routes are close; both are lit.</p>` : ""}
       ${routes ? `<div class="label">route${r.paths.length > 1 ? "s" : ""} · probability per step</div><ol class="routes">${routes}</ol>` : ""}
@@ -356,5 +359,5 @@ export function seriesList(list, theme, withP = false) {
       <span class="dot${s.synced ? " ring" : ""}" style="background:${color[s.freq] ?? c.pencil}"></span>
       <span class="t">${esc(s.title)}</span>
       <code>${esc(s.id)}</code>${withP ? `<i class="p" style="--w:${Math.round((s.p ?? 0) * 100)}%">${(s.p ?? 0).toFixed(2)}</i>` : ""}
-    </a></li>`).join("")}</ul>`;
+    </a>${compareToggle(`${s.source}:${s.id}`, s.title ?? s.id)}</li>`).join("")}</ul>`;
 }

@@ -1,6 +1,7 @@
 // The cards view: concept tree with the cards filed in it, and one card at a time.
 // Hot-reloads over /api/events (wired in app.js). Layout follows docs/DESIGN.md.
 import { fmt, renderPanel } from "../adapters/echarts.js";
+import { keepCard } from "../api.js";
 import { esc, FREQ } from "../util.js";
 
 const LAG_SHORT = { D: "d", W: "wk", M: "mo", Q: "qtr", Y: "yr" };
@@ -23,6 +24,37 @@ export function headlineStats(payloads, theme) {
                value: `${fmt(last[1])}${unit}`, label: `${s.label} · ${last[0]}` });
   });
   return out;
+}
+
+// Lag panels don't carry a frequency; borrow it from the card's series for unit labels.
+// Returns that frequency.
+export function lendLagFreq(payloads) {
+  const freq = payloads.flatMap((p) => p.series ?? []).find((s) => s.freq)?.freq;
+  payloads.forEach((p) => { if (p.type === "lagcorr" && p.annotations) p.annotations.freq = freq; });
+  return freq;
+}
+
+export function errorBlock(errors) {
+  return errors.length ? `<div class="errors"><span class="label">${errors.length} error${errors.length > 1 ? "s" : ""}</span>\n${
+    errors.map((e) => `${esc(e.path)}\n  ${esc(e.message)}${e.hint ? " " + esc(e.hint) : ""}`).join("\n\n")}</div>` : "";
+}
+
+// Keep a drafted card and open it. Refusals show above the view's `.actions` row; `busy`
+// locks the view's controls meanwhile, and `stale` says the view moved on while it waited.
+export async function keepAndOpen(root, card, busy, stale) {
+  busy(true, "Keeping…");
+  const kept = await keepCard(card);
+  if (stale()) return;
+  if (kept.id) { location.hash = `#/cards/${encodeURIComponent(kept.id)}`; return; }
+  busy(false, kept.message);
+  root.querySelector(".keep-errors")?.remove();
+  if (kept.errors.length) root.querySelector(".actions").insertAdjacentHTML("beforebegin",
+    `<div class="keep-errors">${errorBlock(kept.errors)}</div>`);
+}
+
+export function statRow(stats) {
+  return stats.length ? `<div class="stats">${stats.map((s) => `<div class="stat"><b class="${s.neon ? "neon" : ""}">${
+    s.dot ? `<span class="dot" style="background:${s.dot}"></span>` : ""}${esc(s.value)}</b><span class="label">${esc(s.label)}</span></div>`).join("")}</div>` : "";
 }
 
 export function chips(series, theme) {
@@ -117,10 +149,7 @@ export class CardsView {
     const card = body.card;
     document.title = `${card?.title ?? id} · tempus`;
 
-    // Lag panels don't carry a frequency; borrow it from the card's series for unit labels.
-    const freq = body.payloads.flatMap((p) => p.series ?? []).find((s) => s.freq)?.freq;
-    body.payloads.forEach((p) => { if (p.type === "lagcorr" && p.annotations) p.annotations.freq = freq; });
-
+    const freq = lendLagFreq(body.payloads);
     const errors = body.errors.filter((e) => e.level === "error");
     const warnings = body.errors.filter((e) => e.level === "warning");
     const eyebrow = [
@@ -135,10 +164,8 @@ export class CardsView {
       <article class="sticker">
         <div class="label">${esc(eyebrow)}</div>
         ${card ? `<h2 class="question">${esc(card.question)}</h2>` : ""}
-        ${errors.length ? `<div class="errors"><span class="label">${errors.length} error${errors.length > 1 ? "s" : ""}</span>\n${
-          errors.map((e) => `${esc(e.path)}\n  ${esc(e.message)}${e.hint ? " " + esc(e.hint) : ""}`).join("\n\n")}</div>` : ""}
-        ${stats.length ? `<div class="stats">${stats.map((s) => `<div class="stat"><b class="${s.neon ? "neon" : ""}">${
-          s.dot ? `<span class="dot" style="background:${s.dot}"></span>` : ""}${esc(s.value)}</b><span class="label">${esc(s.label)}</span></div>`).join("")}</div>` : ""}
+        ${errorBlock(errors)}
+        ${statRow(stats)}
         <div id="panels"></div>
         ${card?.notes ? `<p class="notes">${esc(card.notes.trim())}</p>` : ""}
         ${warnings.map((w) => `<p class="warning"><b>NOTE</b> ${esc(w.message)}</p>`).join("")}

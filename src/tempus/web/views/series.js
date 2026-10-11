@@ -1,6 +1,7 @@
 // One series: an implicit single-series card (stat + history) built by the engine, plus its
 // facts, where it sits in the tree and why, and its neighbors. Sticker-card layout.
 import { fmt } from "../adapters/echarts.js";
+import { compareToggle } from "../compare.js";
 import { esc, fmtInt, FREQ } from "../util.js";
 import { drawPanels } from "./cards.js";
 import { seriesList } from "./explore.js";
@@ -53,6 +54,7 @@ export class SeriesView {
       <article class="sticker">
         <div class="label">${esc(eyebrow)}</div>
         <h1 class="question">${esc(s.title ?? s.id)}</h1>
+        <div class="foot">${compareToggle(`${s.source}:${s.id}`, s.title ?? s.id)}</div>
         ${stat ? `<div class="stats"><div class="stat"><b class="neon">${fmt(stat.value)}${pct ? "%" : ""}</b>
           <span class="label">${esc(s.units ?? "")} · ${esc(stat.date)}${esc(change)}</span></div></div>` : ""}
         ${page.synced ? "" : `

@@ -262,3 +262,83 @@ The write path from `tempus serve` to `cards/` waits for the phase 2 addendum.
   same idea. `threshold` cards show the current state only.
 - **The phase 2 bar.** The user sets it after seeing the baseline.
 - **Series the snapshot lacks.** Decided 2026-10-11: yes, two or three `xfail` cases.
+
+## Phase 2 addendum: Draft a card in explore (2026-10-11)
+
+The eval cleared the bar (0.74 against 0.70), so drafting moves into the app.
+
+**Decisions (user, 2026-10-11).**
+- The question goes in explore's existing search box. Its answer panel gains a **Draft a card** button.
+- A draft shows the card, rendered, and how it was drafted. Each role has a dropdown of its runners-up; choosing one rebuilds the card at once. About one draft in four picks a wrong series, so this turns most misses into a good card in one click.
+- **Keep** writes `cards/<id>.yaml` on the machine running the app. tempus never touches git; the user commits.
+
+**One-way door.** `tempus serve` gains its first write path, to `cards/`. The guest app (`--share`) never writes: its `/api/draft*` and `POST /api/cards` routes answer 403. Read-only prod mode (`TEMPUS_DB=prod`) can still Keep, because the file is local and the database isn't touched; it just won't sync a picked series that has no observations.
+
+**API.** The drafting routes are stateless, so a swap sends everything it needs.
+
+```text
+POST /api/draft           {"question": str}
+POST /api/draft/assemble  {"question": str, "shape": str, "shape_p": float,
+                           "picks": [{"role": str, "series": str, "probability": float}, ...]}
+  both → 200 {
+    "question": str,
+    "shape": {"name": str, "p": float, "ranked": [[name, p], ...]},   # top 3
+    "picks": [{"role": str, "series": str, "title": str|null, "probability": float,
+               "runners_up": [{"series": str, "title": str|null, "probability": float}, ...]}],
+    "card": <card spec as JSON> | null,
+    "yaml": str | null,                     # the card exactly as Keep would write it
+    "payloads": [...], "errors": [...],     # run_spec output, as /api/cards/{id}
+    "error": str | null,                    # DraftError reason when the card can't be built
+    "synced": [str]
+  }
+  /api/draft/assemble keeps the runners-up the client sends back unchanged; it rebuilds the card
+  from the given picks without asking Jev again (except threshold's line choice).
+
+POST /api/cards           {"card": <card spec as JSON>}
+  → 201 {"id": str}       # kebab-case from the title, at most six words; -2, -3 … if taken
+  → 400 card fails check_card (errors listed); 403 guest
+```
+
+Errors: an empty question is 422. With no `TYPESAFE_API_KEY`, drafting uses the lexical fallback and says so in `"chooser"`.
+
+**Front end.** In the explore view, the answer panel for a query gets a **Draft a card** button. The button opens `#/draft/<question>`, a view that shows:
+- the question, and the kind of answer as a plain label (for example, "does A lead B" for `lead_lag`) with its probability;
+- one row per role: the role in plain words and a dropdown of the pick and its runners-up, by title, with probabilities;
+- the rendered panels (`drawPanels`), a collapsible block with the YAML, and **Keep** and **Discard**.
+
+Keep posts the card and goes to `#/cards/<id>`. Discard goes back to explore. While Jev works (a few seconds), the view shows progress. A `DraftError` shows its reason next to the dropdowns, so swapping a series can fix it. The layout follows `docs/DESIGN.md` and works at phone width.
+
+### Compare several series (added to phase 2, 2026-10-11)
+
+The user asked to pick several series by hand and see how they move together, with no question
+and no Jev. Defaults chosen and reported to the user:
+
+- **Selecting.** Every series row in explore (search results and tree lists) and the series
+  page get a **+ Compare** toggle. A tray pinned to the bottom shows the picks as chips, holds
+  2 to 6 series, persists in `localStorage`, and offers **Compare** and **Clear**.
+- **The view.** `#/compare/<ref>,<ref>,…` shows all the series on one timeseries panel, with a
+  switch between `rebased` (to 100 at the latest common start, never before 2000-01-01),
+  `yoy` (each at monthly or coarser, as `change` does) and `zscore`. The default is `rebased`
+  when units differ and the plain levels (`levels`) when they all match. Under the chart sits a
+  correlation matrix of their year-over-year changes, at a common monthly frequency over the
+  window they share, with the number of months it covers. **Keep** saves the card through
+  `POST /api/cards`.
+- **The card** is a plain v1 card with N inputs (`s1` … `sN`, labelled with titles), the
+  transform's formulas and one timeseries panel, `tags: [compare]`, and a question such as
+  "How do A, B and C move together?". The matrix is shown only and never saved, so the card
+  language stays the same.
+
+```text
+POST /api/compare   {"series": [ref, ...2..6], "mode": "levels" | "rebased" | "yoy" | "zscore" | null}
+  → 200 {
+    "series": [{"series": ref, "title": str|null, "units": str|null, "frequency": str|null}],
+    "mode": str,                       # the mode used (the default when null was sent)
+    "modes": [str],                    # the modes that make sense ("levels" only when units match)
+    "card": <card spec as JSON>, "yaml": str,
+    "payloads": [...], "errors": [...],
+    "correlation": {"refs": [ref...], "matrix": [[float|null]...], "months": int, "start": str|null, "end": str|null}
+  }
+  → 422 fewer than 2 or more than 6 series, duplicates, or an unknown ref
+```
+
+Guest and read-only apps may compare, since it reads only, but Keep stays refused for guests.

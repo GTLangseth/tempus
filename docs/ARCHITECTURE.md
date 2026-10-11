@@ -36,6 +36,7 @@ and the quarterly review procedure live in [`STACK.md`](STACK.md).
 | Filing | ✅ built | `src/tempus/filing.py`, `src/tempus/jev.py` | Places series in the tree by walking it top-down with TypeSafe's Jev; pins in `catalog.toml` override; drafts are re-decided |
 | Navigation | ✅ built | `src/tempus/navigate.py` | Phrase → concepts → series by beam search down the tree (Jev, or a labeled lexical fallback with no key): `/api/navigate`, `tempus resolve` |
 | Drafting | ✅ phase 1 (0.74 on the eval) | `src/tempus/drafting.py`, `src/tempus/grading.py`, `src/tempus/evals.py`, `evals/drafting.yaml` | Question → card: Jev chooses an answer shape (`SHAPES`), `navigate` fills each of its roles with a series, the shape's builder writes a plain v1 card. `tempus card draft "<question>"`; `--eval` grades every eval question by stage (shape, series, valid, renders) across runs |
+| Compare | ✅ built | `src/tempus/compare.py`, `src/tempus/web/views/compare.js` | Pick 2–6 series (a `+ Compare` tray in explore and on series pages) and see them on one chart (levels, rebased, YoY or z-scores) with a correlation matrix of their YoY changes; `POST /api/compare`; Keep saves an ordinary card tagged `compare` |
 | CLI | ✅ built | `src/tempus/cli.py` | `tempus` commands for data actions: sync, catalog, inspect, search, resolve |
 | Repo tooling | ✅ built | `mise.toml` | Pins tools (Python, uv, Node) and runs repo tasks (setup, db, test, lint) |
 | Home base | 🟡 runbook ready | `docs/HOMEBASE.md`, `scripts/homebase/` | Mac mini on Tailscale: real DB and keys, `tempus serve` under launchd published with `tailscale serve`, SSH + tmux for agents from the phone (`mise run homebase:setup`); opt-in password-gated sharing via Funnel (`mise run share:on`) |
@@ -166,6 +167,14 @@ By the horizon in [`SOUL.md`](SOUL.md) where it first matters. Status: ✅ built
 
 Newest first. Each entry: what we chose, and why.
 
+- **2026-10-11 · Drafting and comparing in the app; `tempus serve` writes cards (SPA-43 phase 2).**
+  Explore can draft a card from a question (swap any pick for a runner-up without asking Jev
+  again) or compare 2–6 hand-picked series, and **Keep** writes `cards/<id>.yaml` on the
+  machine running the app. This is the app's first write path. The guest app never writes (403,
+  and the button is hidden). tempus doesn't touch git; the user commits. The compare view's
+  correlation matrix (YoY, monthly, over the dates all series share) is display-only, so the card
+  language is unchanged; per-pair windows are the reversible alternative if one short series
+  narrowing every cell bites.
 - **2026-10-11 · Drafting cards from questions: the Jev drafter, tuned by an eval (SPA-43).**
   Jev chooses an answer shape from a registry, `navigate` fills each role with the role in
   the text Jev reads, and code builds a plain v1 card. Measured by `evals/drafting.yaml`
