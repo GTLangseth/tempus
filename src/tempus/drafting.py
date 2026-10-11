@@ -9,6 +9,7 @@ Three stages, each a separate decision so the eval can say which one failed:
 SHAPES is the only place that knows about shapes. A new shape is one entry here.
 """
 
+import re
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from typing import Protocol
@@ -301,6 +302,7 @@ RUNNERS_UP = 4
 
 class Drafter(Protocol):
     def draft(self, question: str) -> Draft: ...
+    def assemble(self, question: str, shape: ChoiceAnswer, picks: list[Pick]) -> Draft: ...
 
 
 class JevDrafter:
@@ -319,22 +321,27 @@ class JevDrafter:
     def draft(self, question: str) -> Draft:
         criteria = {name: s.describe for name, s in SHAPES.items()}
         answer = self.chooser.choice({"query": question}, SHAPE_QUESTION, criteria)
-        shape = SHAPES[answer.choice]
         picks: list[Pick] = []
-        for role in shape.roles:
+        for role in SHAPES[answer.choice].roles:
             pick = self._pick(question, role, {p.series for p in picks})
             if pick is None:
                 return Draft(question, answer, picks, None, f"no series found for {role}")
             picks.append(pick)
+        return self.assemble(question, answer, picks)
+
+    def assemble(self, question: str, shape: ChoiceAnswer, picks: list[Pick]) -> Draft:
+        """The card for picks already chosen, one per role of `shape.choice` in role order.
+        Asks Jev nothing, except a shape whose build needs one more decision (threshold)."""
         synced = [p.series for p in picks if self._sync(p.series)]
         meta = {p.series: self._meta(p.series) for p in picks}
+        if missing := [ref for ref, row in meta.items() if row is None]:
+            return Draft(question, shape, picks, None, f"no series {missing[0]}", synced)
+        p = shape.probabilities[shape.choice]
         try:
-            card = assemble(
-                shape, answer.probabilities[shape.name], question, picks, meta, self.chooser
-            )
+            card = assemble(SHAPES[shape.choice], p, question, picks, meta, self.chooser)
         except DraftError as exc:
-            return Draft(question, answer, picks, None, str(exc), synced)
-        return Draft(question, answer, picks, card, None, synced)
+            return Draft(question, shape, picks, None, str(exc), synced)
+        return Draft(question, shape, picks, card, None, synced)
 
     def _pick(self, question: str, role: str, taken: set[str]) -> Pick | None:
         found = navigate(question, self.catalog, self.chooser, role=role).series
@@ -348,13 +355,13 @@ class JevDrafter:
 
     def _sync(self, ref: str) -> bool:
         """Sync a picked series that has no observations yet, as a series page does on open."""
-        source, series_id = ref.split(":", 1)
-        if self.sync_source is None or self._meta(ref)["observations"]:
+        if self.sync_source is None or (row := self._meta(ref)) is None or row["observations"]:
             return False
+        source, series_id = ref.split(":", 1)
         src = self.sync_source(source)
         return src is not None and sync_series(self.conn, src, series_id).status != "failed"
 
-    def _meta(self, ref: str) -> dict:
+    def _meta(self, ref: str) -> dict | None:
         source, series_id = ref.split(":", 1)
         return self.conn.execute(
             """
@@ -372,6 +379,17 @@ class JevDrafter:
 
 
 # --- the card as a file ------------------------------------------------------------------
+
+
+def card_id(title: str, taken: set[str]) -> str:
+    """The id a card titled `title` is kept under: its first six words in kebab-case, with
+    -2, -3 … when that id is taken."""
+    base = "-".join(re.sub(r"[^a-z0-9]+", " ", title.lower()).split()[:6]) or "card"
+    n, found = 1, base
+    while found in taken:
+        n += 1
+        found = f"{base}-{n}"
+    return found
 
 
 class _Dumper(yaml.SafeDumper):

@@ -5,7 +5,7 @@ import pytest
 from tempus.cards.check import check_card
 from tempus.cards.run import run_spec
 from tempus.cards.spec import load_card
-from tempus.drafting import SHAPES, DraftError, JevDrafter, Pick, assemble, card_yaml
+from tempus.drafting import SHAPES, DraftError, JevDrafter, Pick, assemble, card_id, card_yaml
 from tempus.filing import NONE
 from tempus.jev import ChoiceAnswer
 from tempus.sources.base import Observation, SeriesMeta
@@ -261,6 +261,16 @@ panels:
     data: correlation
 """
     )
+
+
+def test_card_id_is_the_title_in_kebab_case_at_most_six_words():
+    assert card_id("Crude Oil WTI → CPI Gasoline", set()) == "crude-oil-wti-cpi-gasoline"
+    assert card_id("One two three four five six seven", set()) == "one-two-three-four-five-six"
+
+
+def test_card_id_counts_up_past_ids_already_taken():
+    taken = {"leader-follower", "leader-follower-2"}
+    assert card_id("Leader → Follower", taken) == "leader-follower-3"
 
 
 @pytest.mark.parametrize(

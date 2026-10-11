@@ -965,7 +965,7 @@ def card_draft(
 
     With --eval, draft every question in evals/drafting.yaml and grade each stage.
     """
-    from tempus.drafting import JevDrafter, card_yaml
+    from tempus.drafting import JevDrafter, card_id, card_yaml
     from tempus.explore import catalog_from_db
     from tempus.navigate import LexicalChooser
 
@@ -1014,11 +1014,8 @@ def card_draft(
     text = card_yaml(draft.card)
     typer.echo("\n" + text, nl=False)  # unwrapped, so it pastes as a card file
     if save:
-        words = re.sub(r"[^a-z0-9]+", " ", draft.card.title.lower()).split()
-        path = _cards().path("-".join(words[:6]))
-        if path.exists():
-            console.print(f"[red]{path} already exists; not overwriting[/red]")
-            raise typer.Exit(1)
+        repo = _cards()
+        path = repo.path(card_id(draft.card.title, set(repo.ids())))
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(text)
         console.print(f"\nWrote [bold]{path}[/bold]")
