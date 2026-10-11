@@ -56,11 +56,15 @@ def create_app(
     settings: Settings | None = None,
     sync_source: SourceFactory | None = None,
     guest: bool = False,
+    read_only: bool = False,
 ) -> FastAPI:
-    """`guest=True` is the shared (Funnel) app: read-only, so series pages never sync, and no
-    API docs."""
+    """`read_only=True` never writes: series pages don't sync on open. Reading prod through
+    the tunnel (TEMPUS_DB=prod) is always read-only. `guest=True` is the shared (Funnel)
+    app: read-only, and no API docs."""
     settings = settings or get_settings()
-    sync_source = None if guest else sync_source or default_sync_source(settings)
+    is_remote = settings.db == "prod"
+    read_only = guest or read_only or is_remote
+    sync_source = None if read_only else sync_source or default_sync_source(settings)
     repo = FileCardRepository(settings.cards_path)
     docs = {"docs_url": None, "redoc_url": None, "openapi_url": None} if guest else {}
     app = FastAPI(title="tempus", **docs)
@@ -82,6 +86,10 @@ def create_app(
                 }
             )
         return out
+
+    @app.get("/api/meta")
+    def meta() -> dict:
+        return {"read_only": read_only, "remote": is_remote}
 
     @app.get("/api/cards")
     def list_cards() -> list[dict]:
@@ -151,6 +159,8 @@ def create_app(
             page = series_page(conn, source, series_id, sync_source)
         if page is None:
             raise HTTPException(404, f"no series {source}:{series_id}")
+        if read_only and page["hint"]:
+            page["hint"] = f"{page['hint']}  # on the home base"
         return page
 
     @app.get("/api/events")

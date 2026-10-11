@@ -79,3 +79,52 @@ def test_card_event_ignores_editor_temp_files(settings, name):
 
 def test_static_index_is_served(settings):
     assert TestClient(create_app(settings)).get("/").status_code == 200
+
+
+class _CountingSource:
+    def __init__(self):
+        self.calls = 0
+
+    def __call__(self, name):
+        self.calls += 1
+        return None
+
+
+def _unsynced(conn):
+    conn.execute("INSERT INTO series (source, series_id, title) VALUES ('fred', 'DGS10', 'Ten')")
+
+
+def test_meta_on_dev(settings):
+    assert TestClient(create_app(settings)).get("/api/meta").json() == {
+        "read_only": False,
+        "remote": False,
+    }
+
+
+def test_meta_when_reading_prod(settings):
+    remote_settings = settings.model_copy(update={"db": "prod"})
+    assert TestClient(create_app(remote_settings)).get("/api/meta").json() == {
+        "read_only": True,
+        "remote": True,
+    }
+
+
+def test_meta_for_the_guest_app(settings):
+    meta = TestClient(create_app(settings, guest=True)).get("/api/meta").json()
+    assert meta == {"read_only": True, "remote": False}
+
+
+def test_read_only_turns_sync_on_open_off(conn, settings):
+    _unsynced(conn)
+    source = _CountingSource()
+    client = TestClient(create_app(settings, sync_source=source, read_only=True))
+    page = client.get("/api/series/fred/DGS10").json()
+    assert source.calls == 0 and page["sync"] is None
+    assert page["hint"] == "tempus catalog add fred DGS10 --sync  # on the home base"
+
+
+def test_writable_app_still_syncs_on_open(conn, settings):
+    _unsynced(conn)
+    source = _CountingSource()
+    TestClient(create_app(settings, sync_source=source)).get("/api/series/fred/DGS10")
+    assert source.calls == 1
