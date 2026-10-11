@@ -1,0 +1,207 @@
+# The drafting eval set: docs/specs/2026-10-05-question-to-card-design.md → The eval file.
+# Each role lists every series in the snapshot or catalog a careful analyst would accept.
+# Crude lists include WPU0561 (PPI: crude petroleum), a price index for the same commodity,
+# except where the question needs dollars per barrel.
+version: 1
+cases:
+  # --- The release calendar ---------------------------------------------------
+  - id: unemployment-now
+    question: where's unemployment at
+    shape: level
+    roles:
+      - [fred:UNRATE, fred:UNRATENSA]
+
+  - id: payrolls-growth
+    question: How fast are payrolls growing?
+    shape: change
+    roles:
+      # ADP is a private payroll count, a fair reading of "payrolls".
+      - [fred:PAYEMS, fred:PAYNSA, fred:ADPMNUSNERSA, fred:ADPWNUSNERSA]
+
+  - id: cpi-yoy
+    question: cpi yoy
+    shape: change
+    roles:
+      - [fred:CPIAUCSL, fred:CPIAUCNS]
+
+  - id: inflation-running
+    question: What's inflation running at these days?
+    shape: change
+    roles:
+      - [fred:CPIAUCSL, fred:CPIAUCNS, fred:PCEPI, fred:PCECTPI, fred:SUUR0000SA0, fred:CWSR0000SA0, fred:CWUR0000SA0]
+
+  - id: gdp
+    question: gdp
+    shape: level
+    roles:
+      - [fred:GDP, fred:GDPC1, fred:GDPA, fred:GDPCA, fred:FYGDP, fred:NA000334Q, fred:ND000334Q, fred:NGDPSAXDCUSQ, fred:NGDPNSAXDCUSQ]
+
+  - id: real-gdp-growth
+    question: Is real GDP growing faster or slower than a year ago?
+    shape: change
+    roles:
+      # Precomputed growth rates (A191RL1Q225SBEA, A191RO1Q156NBEA) are left out: the change
+      # shape computes the change itself.
+      - [fred:GDPC1, fred:ND000334Q, fred:GDPCA]
+
+  - id: core-pce-above-target
+    question: Is core PCE still above the Fed's 2% target?
+    shape: threshold
+    roles:
+      - [fred:PCEPILFE]
+
+  - id: sahm-triggered
+    question: has the sahm rule triggered yet
+    shape: threshold
+    roles:
+      - [fred:SAHMREALTIME, fred:SAHMCURRENT]
+
+  - id: ppi-leads-cpi
+    question: Does PPI lead CPI?
+    shape: lead_lag
+    roles:
+      - [fred:PPIFIS, fred:PPIFID, fred:PPIACO, fred:WPSFD49207, fred:WPUFD49207]
+      - [fred:CPIAUCSL, fred:CPIAUCNS]
+
+  # --- Rates and the curve ----------------------------------------------------
+  - id: ten-minus-two
+    question: 10y minus 2y
+    shape: spread
+    roles:
+      # T10Y2Y is this spread precomputed, but as one series it answers `level`, not `spread`.
+      - [fred:DGS10, fred:GS10, fred:WGS10YR, fred:IRLTLT01USM156N]
+      - [fred:DGS2, fred:GS2, fred:WGS2YR]
+
+  - id: ten-minus-three-month
+    question: What's the spread between the 10-year Treasury and the 3-month bill?
+    shape: spread
+    roles:
+      - [fred:DGS10, fred:GS10, fred:WGS10YR, fred:IRLTLT01USM156N]
+      - [fred:DGS3MO, fred:GS3M, fred:DTB3, fred:TB3MS, fred:WTB3MS]
+
+  - id: curve-inverted
+    question: Is the yield curve inverted right now?
+    shape: threshold
+    roles:
+      - [fred:T10Y2Y, fred:T10Y3M, fred:T10Y2YM, fred:T10Y3MM]
+
+  - id: mortgage-minus-ten-year
+    question: How wide is the gap between 30-year mortgage rates and the 10-year?
+    shape: spread
+    also: [compare]
+    roles:
+      - [fred:MORTGAGE30US, fred:OBMMIC30YF]
+      - [fred:DGS10, fred:GS10, fred:WGS10YR, fred:IRLTLT01USM156N]
+
+  - id: fed-leads-mortgages
+    question: When the Fed hikes, how long before mortgage rates follow?
+    shape: lead_lag
+    roles:
+      # The target range bounds are what many people mean by "the fed funds rate".
+      - [fred:FEDFUNDS, fred:DFF, fred:EFFR, fred:FF, fred:RIFSPFFNB, fred:DFEDTARU, fred:DFEDTARL]
+      - [fred:MORTGAGE30US, fred:MORTGAGE15US, fred:OBMMIC30YF, fred:OBMMIC15YF]
+
+  - id: breakevens
+    question: 10-year breakevens and the 5y5y forward
+    shape: compare
+    roles:
+      - [fred:T10YIE, fred:T10YIEM]
+      - [fred:T5YIFR, fred:T5YIFRM]
+
+  # --- Market prices ----------------------------------------------------------
+  - id: oil-and-gasoline
+    question: oil price and gasoline
+    shape: compare
+    also: [lead_lag]
+    roles:
+      - [fred:DCOILWTICO, fred:DCOILBRENTEU, fred:WTISPLC, fred:MCOILWTICO, fred:WCOILWTICO, fred:WPU0561]
+      - [fred:GASREGW, fred:GASREGM, fred:GASREGCOVW, fred:GASREGCOVM, fred:APU000074714, fred:APU00007471A, fred:CUSR0000SETB01, fred:CUUR0000SETB01, fred:DGASUSGULF, fred:DGASNYH]
+
+  - id: gold-versus-dollar
+    question: Gold versus the dollar
+    shape: compare
+    also: [ratio]
+    roles:
+      # The snapshot's only gold price series is the NASDAQ gold index.
+      - [fred:NASDAQQGLDI]
+      - [fred:DTWEXBGS, fred:TWEXBGSMTH, fred:DTWEXAFEGS, fred:RTWEXBGS, fred:NBUSBIS, fred:RBUSBIS]
+
+  - id: sp500-in-gold
+    question: S&P 500 priced in gold
+    shape: ratio
+    roles:
+      - [fred:SP500]
+      - [fred:NASDAQQGLDI]
+
+  - id: nasdaq-vs-sp500
+    question: How is the Nasdaq doing relative to the S&P?
+    shape: ratio
+    roles:
+      - [fred:NASDAQCOM, fred:NASDAQ100, fred:NASDAQXCMP, fred:NASDAQXNDX]
+      - [fred:SP500]
+
+  - id: real-oil-price
+    question: What's the price of oil adjusted for inflation?
+    shape: ratio
+    roles:
+      - [fred:DCOILWTICO, fred:DCOILBRENTEU, fred:WTISPLC, fred:MCOILWTICO, fred:WCOILWTICO, fred:WPU0561]
+      - [fred:CPIAUCSL, fred:CPIAUCNS, fred:PCEPI]
+
+  - id: yen-move
+    question: How much has the yen weakened against the dollar over the past year?
+    shape: change
+    roles:
+      - [fred:DEXJPUS, fred:EXJPUS]
+
+  # --- Inflation and its pass-through -----------------------------------------
+  - id: crude-leads-gasoline-cpi
+    question: Does crude lead gasoline CPI?
+    shape: lead_lag
+    roles:
+      - [fred:DCOILWTICO, fred:DCOILBRENTEU, fred:WTISPLC, fred:MCOILWTICO, fred:WCOILWTICO, fred:WPU0561]
+      - [fred:CUSR0000SETB01, fred:CUUR0000SETB01]
+
+  - id: coffee-pass-through
+    question: How long does a move in arabica take to show up in coffee prices at the store?
+    shape: lead_lag
+    roles:
+      - [fred:PCOFFOTMUSDM]
+      - [fred:CUSR0000SEFP01, fred:APU0000717311]
+
+  - id: home-prices-lead-shelter
+    question: Do home prices lead shelter inflation, and by how much?
+    shape: lead_lag
+    roles:
+      - [fred:CSUSHPINSA, fred:CSUSHPISA, fred:SPCS20RSA, fred:SPCS20RNSA, fred:SPCS10RSA, fred:USSTHPI, fred:HPIPONM226S]
+      - [fred:CUSR0000SAH1, fred:CUSR0000SEHA, fred:CUUR0000SEHA, fred:CUSR0000SEHC]
+
+  - id: wages-and-inflation
+    question: wages and inflation since 2020
+    shape: compare
+    also: [ratio]
+    roles:
+      - [fred:CES0500000003, fred:CEU0500000003, fred:AHETPI, fred:ECIWAG, fred:LES1252881500Q]
+      - [fred:CPIAUCSL, fred:CPIAUCNS, fred:PCEPI]
+
+  # --- Can't answer well yet ----------------------------------------------------
+  - id: gold-spot
+    question: What's gold trading at per ounce?
+    shape: level
+    xfail: no gold spot price in $/oz; NASDAQQGLDI is an index, the closest the snapshot has
+    roles:
+      - [fred:NASDAQQGLDI]
+
+  - id: fed-expectations
+    question: Where does the market think fed funds will be in a year?
+    shape: level
+    xfail: no fed funds futures or prediction markets yet; the 1-year Treasury is a rough proxy
+    roles:
+      - [fred:DGS1, fred:GS1, fred:DTB1YR, fred:TB1YR]
+
+  - id: gasoline-crack-spread
+    question: gasoline crack spread
+    shape: spread
+    xfail: gasoline is $/gallon and crude $/barrel; the spread needs a unit conversion tempus lacks
+    roles:
+      - [fred:DGASNYH, fred:DGASUSGULF]
+      - [fred:DCOILWTICO, fred:DCOILBRENTEU, fred:WTISPLC, fred:MCOILWTICO, fred:WCOILWTICO]
