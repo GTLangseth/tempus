@@ -35,6 +35,7 @@ and the quarterly review procedure live in [`STACK.md`](STACK.md).
 | Draft placements | 🟡 temporary | `ontology/placements.draft.yaml` | Claude-written homes for the snapshot series, loaded as method `draft`; replaced by Jev filing (see Decisions) |
 | Filing | ✅ built | `src/tempus/filing.py`, `src/tempus/jev.py` | Places series in the tree by walking it top-down with TypeSafe's Jev; pins in `catalog.toml` override; drafts are re-decided |
 | Navigation | ✅ built | `src/tempus/navigate.py` | Phrase → concepts → series by beam search down the tree (Jev, or a labeled lexical fallback with no key): `/api/navigate`, `tempus resolve` |
+| Drafting | 🟡 phase 1 (eval) | `src/tempus/drafting.py`, `src/tempus/grading.py`, `src/tempus/evals.py`, `evals/drafting.yaml` | Question → card: Jev chooses an answer shape (`SHAPES`), `navigate` fills each of its roles with a series, the shape's builder writes a plain v1 card. `tempus card draft "<question>"`; `--eval` grades every eval question by stage (shape, series, valid, renders) across runs |
 | CLI | ✅ built | `src/tempus/cli.py` | `tempus` commands for data actions: sync, catalog, inspect, search, resolve |
 | Repo tooling | ✅ built | `mise.toml` | Pins tools (Python, uv, Node) and runs repo tasks (setup, db, test, lint) |
 | Home base | 🟡 runbook ready | `docs/HOMEBASE.md`, `scripts/homebase/` | Mac mini on Tailscale: real DB and keys, `tempus serve` under launchd published with `tailscale serve`, SSH + tmux for agents from the phone (`mise run homebase:setup`); opt-in password-gated sharing via Funnel (`mise run share:on`) |
@@ -63,6 +64,9 @@ ontology/placements.draft.yaml ──▶ tempus ontology load
                      ▼
 cards/*.yaml ──▶ card engine (check · resolve · evaluate · render) ──▶ panel payloads ──▶ tempus serve ──▶ browser
                                                                         /api/explore · /api/navigate · /api/series
+
+question ──▶ tempus card draft ──▶ Jev: shape ──▶ navigate per role ──▶ shape builder ──▶ v1 card
+evals/drafting.yaml ──▶ tempus card draft --eval ──▶ grade by stage ──▶ report (evals/baselines/*.json)
 
 dev DB (MacBook) ◀── tempus db pull ──┐
                                       ├── ssh -L via homebase ──▶ prod DB (home base)

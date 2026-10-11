@@ -68,6 +68,8 @@ tempus ontology file               # file unplaced and draft-placed series with 
 tempus ontology load               # validate + load concepts.yaml and draft placements (sync does this too)
 tempus catalog import-snapshot data/fred/series-snapshot.json  # browse without syncing
 tempus resolve "crude oil price"   # phrase → concepts → series, with probabilities
+tempus card draft "Does crude lead gasoline CPI?"   # draft a card: shape, a series per role, the YAML (--save)
+tempus card draft --eval          # grade every question in evals/drafting.yaml (--runs 3, --json)
 ```
 
 To pin a series to a concept by hand, add `concept = "rates.mortgage"` to its `catalog.toml`
