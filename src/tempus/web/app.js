@@ -17,6 +17,8 @@ await document.fonts.ready; // so charts measure text in the real fonts
 
 // Reading prod through the tunnel (TEMPUS_DB=prod): say so on every page.
 const meta = await fetch("/api/meta").then((r) => (r.ok ? r.json() : {})).catch(() => ({}));
+// The shared guest copy can't draft or keep cards, so it shows no Draft button.
+if (meta.guest) document.body.dataset.guest = "";
 if (meta.remote) {
   const badge = document.createElement("span");
   badge.className = "chip remote-badge";

@@ -174,7 +174,7 @@ def create_app(
 
     @app.get("/api/meta")
     def meta() -> dict:
-        return {"read_only": read_only, "remote": is_remote}
+        return {"read_only": read_only, "remote": is_remote, "guest": guest}
 
     @app.get("/api/cards")
     def list_cards() -> list[dict]:

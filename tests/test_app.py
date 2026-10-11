@@ -98,6 +98,7 @@ def test_meta_on_dev(settings):
     assert TestClient(create_app(settings)).get("/api/meta").json() == {
         "read_only": False,
         "remote": False,
+        "guest": False,
     }
 
 
@@ -106,12 +107,13 @@ def test_meta_when_reading_prod(settings):
     assert TestClient(create_app(remote_settings)).get("/api/meta").json() == {
         "read_only": True,
         "remote": True,
+        "guest": False,
     }
 
 
 def test_meta_for_the_guest_app(settings):
     meta = TestClient(create_app(settings, guest=True)).get("/api/meta").json()
-    assert meta == {"read_only": True, "remote": False}
+    assert meta == {"read_only": True, "remote": False, "guest": True}
 
 
 def test_read_only_turns_sync_on_open_off(conn, settings):

@@ -297,3 +297,6 @@ th { color: var(--pencil); font-weight: 500; text-transform: uppercase; letter-s
   .explore[data-mode="outline"] .stage { order: 2; padding: 0; overflow: visible; }
   .explore .hint, .explore .labels { display: none; }
 }
+
+/* The shared guest copy is read-only: no drafting. */
+body[data-guest] .draft-link { display: none; }
