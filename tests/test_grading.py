@@ -103,6 +103,11 @@ def test_wrong_number_of_picks_fails_series():
     assert grade(OIL_GAS, d, None).reason == "picked 1 series for 2 roles"
 
 
+def test_a_role_nothing_fills_reports_the_drafter_s_reason():
+    d = draft("lead_lag", [], error="no series found for the measure that moves first")
+    assert grade(OIL_GAS, d, None).reason == "no series found for the measure that moves first"
+
+
 def test_unordered_swap_passes_series():
     picks = [
         ("the first measure", "fred:YFOLLOW", 0.6),

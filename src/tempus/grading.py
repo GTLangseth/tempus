@@ -75,7 +75,7 @@ def _series(case: Case, draft: Draft) -> str | None:
     if len(chosen.roles) != len(case.roles):
         return None
     if len(draft.picks) != len(case.roles):
-        return f"picked {len(draft.picks)} series for {len(case.roles)} roles"
+        return draft.error or f"picked {len(draft.picks)} series for {len(case.roles)} roles"
     miss = _first_miss(draft.picks, case.roles)
     if miss is None:
         return None

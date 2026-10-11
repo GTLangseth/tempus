@@ -187,7 +187,7 @@ cases:
   - id: gold-spot
     question: What's gold trading at per ounce?
     shape: level
-    xfail: no gold spot price in $/oz; NASDAQQGLDI is an index, the closest the snapshot has
+    # No gold spot price in $/oz in the snapshot; the NASDAQ gold index is the honest answer.
     roles:
       - [fred:NASDAQQGLDI]
 
