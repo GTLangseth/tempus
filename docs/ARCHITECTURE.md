@@ -38,6 +38,7 @@ and the quarterly review procedure live in [`STACK.md`](STACK.md).
 | CLI | ✅ built | `src/tempus/cli.py` | `tempus` commands for data actions: sync, catalog, inspect, search, resolve |
 | Repo tooling | ✅ built | `mise.toml` | Pins tools (Python, uv, Node) and runs repo tasks (setup, db, test, lint) |
 | Home base | 🟡 runbook ready | `docs/HOMEBASE.md`, `scripts/homebase/` | Mac mini on Tailscale: real DB and keys, `tempus serve` under launchd published with `tailscale serve`, SSH + tmux for agents from the phone (`mise run homebase:setup`); opt-in password-gated sharing via Funnel (`mise run share:on`) |
+| Dev and prod databases | ✅ built | `src/tempus/remote.py`, `src/tempus/transfer.py` | `tempus db pull/push/where` and `TEMPUS_DB=prod`: an SSH tunnel to the home base's Postgres. Pull replaces dev's copy; push merges whole series and Jev placements into prod, never deleting; read-only mode serves local code over prod as `tempus_ro` |
 | Scheduler | 🟡 minimal | `tempus sync --every 6h` | A blocking loop for now; see open questions |
 | Cards | ✅ built | `cards/`, `src/tempus/cards/` | Card language v1 (inputs, formulas, panels), static checks, Polars engine, panel payloads |
 | App | ✅ built | `src/tempus/app.py`, `src/tempus/explore.py`, `src/tempus/web/` | `tempus serve`: FastAPI engine API + no-build static front end (ECharts, three.js), hot reload |
@@ -62,6 +63,10 @@ ontology/placements.draft.yaml ──▶ tempus ontology load
                      ▼
 cards/*.yaml ──▶ card engine (check · resolve · evaluate · render) ──▶ panel payloads ──▶ tempus serve ──▶ browser
                                                                         /api/explore · /api/navigate · /api/series
+
+dev DB (MacBook) ◀── tempus db pull ──┐
+                                      ├── ssh -L via homebase ──▶ prod DB (home base)
+dev DB (MacBook) ── tempus db push ───┘   (TEMPUS_DB=prod: read prod directly, as tempus_ro)
 ```
 
 ## Data model
@@ -157,6 +162,14 @@ By the horizon in [`SOUL.md`](SOUL.md) where it first matters. Status: ✅ built
 
 Newest first. Each entry: what we chose, and why.
 
+- **2026-10-11 · Dev and prod databases over SSH (SPA-46).** Develop against a dev database
+  on the MacBook without re-running backfills or risking prod. Rows move with `COPY` through a
+  short-lived `ssh -L` tunnel; push merges whole series on the provider's revision time and
+  never deletes; read-only mode connects as a SELECT-only role. Chosen over extract files (a
+  format to own; deferred until cloud sessions need prod data) and replication (fragile with
+  hypertables, overkill for one user). Series metadata and observations always move; of the
+  placements only Jev's (`auto`) do, since pins and drafts come from git on each side. Spec:
+  `docs/specs/2026-10-11-dev-prod-db-sync-design.md`.
 - **2026-10-05 · Sharing outside the tailnet: an opt-in, password-gated Funnel to a guest
   app.** Colleagues without Tailscale needed a way in, without making public access the
   default. `mise run share:on` starts a second, read-only `tempus serve --share` on

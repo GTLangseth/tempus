@@ -5,6 +5,8 @@ from typer.testing import CliRunner
 
 from tempus.cli import app
 
+from ..conftest import TEST_DB
+
 runner = CliRunner()
 ROOT = Path(__file__).parents[2]
 
@@ -55,9 +57,7 @@ def test_show_json_against_the_test_db(conn, monkeypatch, tmp_path: Path):
         (Path(__file__).parent / "fixtures" / "lead.yaml").read_text()
     )
     monkeypatch.chdir(tmp_path)
-    monkeypatch.setenv(
-        "DATABASE_URL", make_conninfo(get_settings().database_url, dbname="tempus_test")
-    )
+    monkeypatch.setenv("DATABASE_URL", make_conninfo(get_settings().database_url, dbname=TEST_DB))
     result = runner.invoke(app, ["card", "show", "lead", "--json"])
     assert result.exit_code == 0, result.output
     assert json.loads(result.output)["payloads"][1]["annotations"]["peak"]["lag"] == 1

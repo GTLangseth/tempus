@@ -1,6 +1,6 @@
 # Dev and prod databases: pull, push and read-only prod over SSH
 
-- **Status:** Draft
+- **Status:** Implemented 2026-10-11 (SPA-46, PR #13)
 - **Linear:** SPA-46
 - **Horizon:** 1 · Explore (see `docs/SOUL.md`); development tooling for every later horizon
 - **Related:** `docs/HOMEBASE.md` (SPA-39); `src/tempus/sync.py` (skip-if-unchanged);
@@ -183,6 +183,19 @@ One line each, in the CLI's existing style:
 - Dev isn't local, or `TEMPUS_DB=prod` with pull/push: says which guard and why.
 
 A failed push rolls back entirely; a failed pull leaves dev untouched.
+
+## Changes during implementation
+
+- Series metadata and observations always move whole. Of the placements, only `auto` ones
+  (Jev placements) move in either direction; pins and drafts come from git on each side
+  (pushing drafts would ping-pong, since every `ontology load` refreshes their `filed_at`).
+- `tempus db readonly-role` creates the role; `homebase:setup` calls it.
+- `/api/meta` returns `remote` (from `TEMPUS_DB=prod`) rather than a `database` name, and
+  series pages carry `read_only` so the page can say why it won't sync.
+- `pull --series` keeps dev's copy of a series prod doesn't have and reports it.
+- `--concept` matches descendants with `starts_with`, not `LIKE` (`_` in ids is a wildcard).
+- The spec, plan and code landed in one PR (#13); `docs/specs/README.md` now describes that
+  flow.
 
 ## One-way doors
 

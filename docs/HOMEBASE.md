@@ -124,12 +124,37 @@ or folder, set `TEMPUS_HOMEBASE_HOST` and `TEMPUS_HOMEBASE_DIR`. This checkout i
 launchd serves, so keep it on `main` when you're done and restart the app after a pull
 (see [Day to day](#day-to-day)).
 
-## Use the mini's database from the MacBook
+## Dev and prod databases
+
+The MacBook's database is **dev**: change it freely. The mini's is **prod**. These commands
+connect them over SSH. A tunnel through the `homebase` alias opens and closes for you, and
+no port opens on either machine.
 
 ```sh
-ssh -N -L 5433:127.0.0.1:5432 <you>@<mini>      # leave running; use the mini's TEMPUS_DB_PORT on the right
-DATABASE_URL=postgres://postgres:password@localhost:5433/tempus uv run tempus series list
+uv run tempus db pull                     # prod's series, observations and Jev placements → dev
+uv run tempus db push                     # what dev synced or Jev placed that prod lacks (dry run)
+uv run tempus db push --yes               # …and send it; never deletes anything on prod
+TEMPUS_DB=prod uv run tempus serve        # your code over prod's data, read-only
+uv run tempus db where                    # which one am I on?
 ```
+
+`pull` and `push` take `--series fred:UNRATE,…` or `--concept labor`; `pull` also takes
+`--metadata-only`. Backfill in dev, then push, and prod never fetches the same data twice.
+`sync` after a `pull` downloads only what changed since prod's copy. `pull` refuses while
+dev holds syncs or Jev placements prod doesn't have: push them, or pull with
+`--discard-local`. Pins and draft placements aren't copied; each side rebuilds them from
+git (`ontology load`).
+
+**Once, on the mini:** `mise run homebase:setup` creates the read-only `tempus_ro` role and
+prints the line to copy. **On the MacBook**, add to `.env`: `TEMPUS_PROD_RO_PASSWORD` (from
+that line), `TEMPUS_PROD_DB_PORT` (the mini's `TEMPUS_DB_PORT`), and for `push`,
+`TEMPUS_PROD_PASSWORD` (the password in the mini's `DATABASE_URL`). Keep them with your
+other secrets (`secrets push|pull`), never in git.
+
+With `TEMPUS_DB=prod`, the header shows **prod · read-only**, series pages don't sync on
+open, and commands that write refuse. Postgres enforces it too: `tempus_ro` can only read.
+Cards come from your local `cards/`; the concept tree comes from prod, so an unshipped
+`ontology/concepts.yaml` edit won't show in this mode.
 
 ## Share with colleagues
 
