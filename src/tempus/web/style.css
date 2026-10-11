@@ -349,4 +349,11 @@ body { padding-bottom: var(--tray-space, 0px); }
 }
 
 /* The shared guest copy is read-only: no drafting. */
+/* "Draft a card": a quiet link under the question, highlighted on hover. */
+.draft-link {
+  justify-self: start; font: 500 11px/1 var(--font-mono); letter-spacing: 0.06em;
+  text-transform: uppercase; text-decoration: none; color: var(--graphite); padding: 4px 2px;
+}
+.draft-link:hover, .draft-link:focus-visible { color: var(--ink);
+  background: linear-gradient(transparent 52%, var(--highlight-lime) 52%, var(--highlight-lime) 92%, transparent 92%); }
 body[data-guest] .draft-link, body[data-guest] .compare .keep { display: none; }

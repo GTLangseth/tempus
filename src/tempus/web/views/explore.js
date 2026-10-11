@@ -298,8 +298,8 @@ export class ExploreView {
     this.panel.innerHTML = `
       <div class="label">asked · ${fallback ? `<span class="flag">${esc(r.chooser)}</span>` : "jev"}</div>
       <h2 class="panel-title">${esc(r.query)}</h2>
-      <div class="foot"><a class="btn draft-link" href="#/draft/${encodeURIComponent(r.query)}">Draft a card</a>
-        <span class="desc">a chart that answers it, ready to keep</span></div>
+      <a class="draft-link" href="#/draft/${encodeURIComponent(r.query)}"
+        title="Draft a chart that answers it, ready to keep">Draft a card →</a>
       ${r.paths.length ? "" : `<p class="note">Nothing in the tree fits that. Try other words, or browse.</p>`}
       ${r.ambiguous ? `<p class="note"><b>Two readings.</b> The top routes are close; both are lit.</p>` : ""}
       ${routes ? `<div class="label">route${r.paths.length > 1 ? "s" : ""} · probability per step</div><ol class="routes">${routes}</ol>` : ""}
