@@ -63,19 +63,21 @@ export const refLabel = (ref, title, n) =>
 // A + Compare toggle for one series. Clicks are handled by the document-wide listener below,
 // so markup rendered as strings by any view works without wiring.
 // Phones show only the glyph in list rows, so it sits apart from the word.
-const toggleFace = (on) => (on ? `<i>✓</i><span> Comparing</span>` : `<i>+</i><span> Compare</span>`);
+const toggleFace = (on) => (on ? "✓" : "+");
+const toggleHint = (on) => (on ? "Remove from compare" : "Add to compare");
 
 export function compareToggle(ref, title, extra = "") {
   const on = selection.has(ref);
   return `<button type="button" class="cmp-toggle ${extra}" data-ref="${esc(ref)}" data-title="${esc(title)}"
-    aria-pressed="${on}" aria-label="Compare ${esc(title)}">${toggleFace(on)}</button>`;
+    aria-pressed="${on}" aria-label="Compare ${esc(title)}" title="${toggleHint(on)}">${toggleFace(on)}</button>`;
 }
 
 function syncToggles() {
   document.querySelectorAll(".cmp-toggle").forEach((b) => {
     const on = selection.has(b.dataset.ref);
     b.setAttribute("aria-pressed", String(on));
-    b.innerHTML = toggleFace(on);
+    b.textContent = toggleFace(on);
+    b.title = toggleHint(on);
   });
 }
 

@@ -284,19 +284,14 @@ th { color: var(--pencil); font-weight: 500; text-transform: uppercase; letter-s
 /* --- compare: + Compare toggles, the tray, the compare view -------------------------- */
 .series-list li { display: flex; align-items: center; gap: 4px; }
 .series-list li > a { flex: 1; min-width: 0; }
-.cmp-toggle:not(.btn) {
-  flex: none; font: 500 11px/1 var(--font-mono); letter-spacing: 0.06em; text-transform: uppercase;
-  font-feature-settings: "calt" 0, "liga" 0; white-space: nowrap; cursor: pointer;
-  border: 1px solid var(--hairline); border-radius: 9999px; padding: 5px 8px;
-  background: var(--paper); color: var(--graphite);
+/* A subtle "+": muted until hovered, a lime-marked check once picked. */
+.cmp-toggle {
+  flex: none; width: 22px; height: 22px; padding: 0; border: 0; border-radius: 9999px;
+  font: 500 14px/22px var(--font-mono); text-align: center; cursor: pointer;
+  background: transparent; color: var(--graphite); opacity: 0.45;
 }
-.cmp-toggle:not(.btn):hover { border-color: var(--ink); color: var(--ink); }
-.cmp-toggle[aria-pressed="true"] { border-color: var(--ink); color: var(--ink); }
-.cmp-toggle:not(.btn)[aria-pressed="true"] {
-  background: linear-gradient(transparent 52%, var(--highlight-lime) 52%, var(--highlight-lime) 92%, transparent 92%), var(--paper);
-}
-.cmp-toggle i { font-style: normal; }
-.cmp-toggle.btn { justify-self: start; }
+.cmp-toggle:hover, .cmp-toggle:focus-visible { opacity: 1; color: var(--ink); background: var(--hairline); }
+.cmp-toggle[aria-pressed="true"] { opacity: 1; color: var(--ink); background: var(--highlight-lime); }
 
 body { padding-bottom: var(--tray-space, 0px); }
 .tray {
@@ -345,9 +340,8 @@ body { padding-bottom: var(--tray-space, 0px); }
   .explore .corner { order: 3; justify-items: start; }
   .explore[data-mode="outline"] .stage { order: 2; padding: 0; overflow: visible; }
   .explore .hint, .explore .labels { display: none; }
-  .series-list .cmp-toggle span, .corr tbody th span { display: none; }
+  .corr tbody th span { display: none; }
   .corr td, .corr th { padding: 3px 8px; min-width: 56px; }
-  .series-list .cmp-toggle { min-width: 32px; }
   .tray { flex-wrap: wrap; padding: 10px 12px; }
   .tray-chips { flex-basis: 100%; }
   .tray-actions { flex: 1; }

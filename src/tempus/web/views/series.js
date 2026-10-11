@@ -54,7 +54,7 @@ export class SeriesView {
       <article class="sticker">
         <div class="label">${esc(eyebrow)}</div>
         <h1 class="question">${esc(s.title ?? s.id)}</h1>
-        <div class="foot">${compareToggle(`${s.source}:${s.id}`, s.title ?? s.id, "btn ghost")}</div>
+        <div class="foot">${compareToggle(`${s.source}:${s.id}`, s.title ?? s.id)}</div>
         ${stat ? `<div class="stats"><div class="stat"><b class="neon">${fmt(stat.value)}${pct ? "%" : ""}</b>
           <span class="label">${esc(s.units ?? "")} · ${esc(stat.date)}${esc(change)}</span></div></div>` : ""}
         ${page.synced ? "" : `
