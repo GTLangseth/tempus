@@ -333,7 +333,7 @@ class JevDrafter:
         """The card for picks already chosen, one per role of `shape.choice` in role order.
         Asks Jev nothing, except a shape whose build needs one more decision (threshold)."""
         synced = [p.series for p in picks if self._sync(p.series)]
-        meta = {p.series: self._meta(p.series) for p in picks}
+        meta = {p.series: series_meta(self.conn, p.series) for p in picks}
         if missing := [ref for ref, row in meta.items() if row is None]:
             return Draft(question, shape, picks, None, f"no series {missing[0]}", synced)
         p = shape.probabilities[shape.choice]
@@ -355,27 +355,35 @@ class JevDrafter:
 
     def _sync(self, ref: str) -> bool:
         """Sync a picked series that has no observations yet, as a series page does on open."""
-        if self.sync_source is None or (row := self._meta(ref)) is None or row["observations"]:
+        if (
+            self.sync_source is None
+            or (row := series_meta(self.conn, ref)) is None
+            or row["observations"]
+        ):
             return False
         source, series_id = ref.split(":", 1)
         src = self.sync_source(source)
         return src is not None and sync_series(self.conn, src, series_id).status != "failed"
 
-    def _meta(self, ref: str) -> dict | None:
-        source, series_id = ref.split(":", 1)
-        return self.conn.execute(
-            """
-            SELECT s.title, s.units, s.frequency,
-                   coalesce(s.extra->>'observation_start', o.first::date::text)
-                       AS observation_start,
-                   o.n AS observations
-            FROM series s,
-                 LATERAL (SELECT min(ts) AS first, count(*) AS n FROM observations
-                          WHERE source = s.source AND series_id = s.series_id) o
-            WHERE s.source = %s AND s.series_id = %s
-            """,
-            (source, series_id),
-        ).fetchone()
+
+def series_meta(conn: psycopg.Connection, ref: str) -> dict | None:
+    """The `series` row a card is built from, or None for a ref that isn't in the database."""
+    if ":" not in ref:
+        return None
+    source, series_id = ref.split(":", 1)
+    return conn.execute(
+        """
+        SELECT s.title, s.units, s.frequency,
+               coalesce(s.extra->>'observation_start', o.first::date::text)
+                   AS observation_start,
+               o.n AS observations
+        FROM series s,
+             LATERAL (SELECT min(ts) AS first, count(*) AS n FROM observations
+                      WHERE source = s.source AND series_id = s.series_id) o
+        WHERE s.source = %s AND s.series_id = %s
+        """,
+        (source, series_id),
+    ).fetchone()
 
 
 # --- the card as a file ------------------------------------------------------------------
