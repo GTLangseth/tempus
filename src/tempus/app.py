@@ -21,8 +21,9 @@ from tempus.cards.errors import has_errors
 from tempus.cards.repository import FileCardRepository
 from tempus.cards.run import run_card, run_spec
 from tempus.cards.spec import CARD_ID, parse_card
+from tempus.compare import MODES, compare_card, correlation, default_mode, modes
 from tempus.config import Settings, get_settings
-from tempus.drafting import SHAPES, Draft, JevDrafter, Pick, card_yaml
+from tempus.drafting import SHAPES, Draft, JevDrafter, Pick, card_yaml, series_meta
 from tempus.drafting import card_id as card_id_for
 from tempus.explore import SourceFactory, catalog_from_db, explore_payload, series_page
 from tempus.filing import Chooser
@@ -79,6 +80,11 @@ class AssembleRequest(DraftRequest):
     shape: str
     shape_p: float
     picks: list[PickIn]
+
+
+class CompareRequest(BaseModel):
+    series: list[str]
+    mode: str | None = None
 
 
 class KeepRequest(BaseModel):
@@ -284,6 +290,37 @@ def create_app(
         answer = ChoiceAnswer(shape.name, {shape.name: req.shape_p})
         with db.connect(settings.database_url) as conn:
             return drafting(conn, lambda d: d.assemble(question, answer, picks))
+
+    @app.post("/api/compare")
+    def compare_route(req: CompareRequest) -> dict:
+        """Read only, so guest and read-only apps may compare."""
+        refs = req.series
+        if not 2 <= len(refs) <= 6:
+            raise HTTPException(422, "compare 2 to 6 series")
+        if len(set(refs)) != len(refs):
+            raise HTTPException(422, "each series once")
+        if req.mode is not None and req.mode not in MODES:
+            raise HTTPException(422, f"no mode '{req.mode}': one of {list(MODES)}")
+        with db.connect(settings.database_url) as conn:
+            meta = {ref: series_meta(conn, ref) for ref in refs}
+            if missing := [ref for ref, row in meta.items() if row is None]:
+                raise HTTPException(422, f"no series {missing[0]}")
+            card = compare_card(refs, meta, req.mode)
+            result = run_spec(conn, "compare", card)
+            matrix = correlation(conn, refs)
+        return {
+            "series": [
+                {"series": ref, **{k: meta[ref][k] for k in ("title", "units", "frequency")}}
+                for ref in refs
+            ],
+            "mode": req.mode or default_mode(meta),
+            "modes": modes(meta),
+            "card": card.model_dump(mode="json", exclude_none=True, exclude_defaults=True),
+            "yaml": card_yaml(card),
+            "payloads": result.payloads,
+            "errors": [e.to_dict() for e in result.errors],
+            "correlation": matrix,
+        }
 
     @app.post("/api/cards", status_code=201, dependencies=[Depends(no_guest)])
     def keep_route(req: KeepRequest):
