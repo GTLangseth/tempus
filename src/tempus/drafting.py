@@ -225,7 +225,8 @@ SHAPES: dict[str, Shape] = {
         ),
         Shape(
             "change",
-            "Asks how fast one measure is rising or falling: its growth or change over a year.",
+            "Asks how fast one measure is rising or falling: its growth rate, its change over a "
+            "year, or how hot or cool it is running (inflation, growth, wage gains).",
             ("the measure",),
             True,
             _change,
@@ -246,7 +247,9 @@ SHAPES: dict[str, Shape] = {
         ),
         Shape(
             "ratio",
-            "Asks for one measure relative to another: one divided by the other.",
+            "Asks for one measure in terms of another: one divided by the other. Includes one "
+            "index or price relative to another (stocks in gold, Nasdaq relative to the S&P) and "
+            "a real, inflation-adjusted price (a price divided by a price index).",
             ("the numerator", "the denominator"),
             True,
             _ratio,
