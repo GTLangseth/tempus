@@ -905,6 +905,64 @@ def card_load():
     console.print(f"Loaded {loaded} card(s)")
 
 
+@card_app.command("draft")
+def card_draft(
+    question: str = typer.Argument(..., help='e.g. "Does crude lead gasoline CPI?"'),
+    lexical: bool = typer.Option(False, help="Use the lexical fallback even with a key"),
+    save: bool = typer.Option(False, help="Write the card to cards/<id>.yaml"),
+):
+    """Draft a card that answers a question: Jev picks the shape and a series per role."""
+    from tempus.drafting import JevDrafter, card_yaml
+    from tempus.explore import catalog_from_db
+    from tempus.navigate import LexicalChooser
+
+    settings = get_settings()
+    can_sync = settings.fred_api_key and settings.db != "prod"
+    sync_source = (
+        (lambda name: get_source(name, settings) if name in SOURCE_NAMES else None)
+        if can_sync
+        else None
+    )
+    with _connect() as conn:
+        if settings.typesafe_api_key and not lexical:
+            chooser, label = JevClient(settings.typesafe_api_key), "jev"
+        else:
+            chooser, label = LexicalChooser(catalog_from_db(conn)), "lexical fallback"
+        drafter = JevDrafter(conn, chooser, sync_source=sync_source)
+        if not drafter.catalog.roots:
+            console.print("[yellow]No concepts loaded.[/yellow] Run `tempus ontology load`.")
+            raise typer.Exit(1)
+        try:
+            draft = drafter.draft(question)
+        except JevError as exc:
+            console.print(f"[red]{exc}[/red]")
+            raise typer.Exit(1) from exc
+    console.print(f"[dim]chooser: {label}[/dim]")
+    top = " · ".join(f"{name} {p:.2f}" for name, p in draft.shape.ranked()[:3])
+    console.print(f"[bold]shape[/bold]  {top}")
+    for pick in draft.picks:
+        console.print(f"[bold]{pick.role}[/bold]  {pick.series} {pick.probability:.2f}")
+        if pick.runners_up:
+            others = ", ".join(f"{ref} {p:.2f}" for ref, p in pick.runners_up)
+            console.print(f"  [dim]runners-up: {others}[/dim]")
+    for ref in draft.synced:
+        console.print(f"[dim]synced {ref}[/dim]")
+    if draft.card is None:
+        console.print(f"[red]Could not draft a card:[/red] {draft.error}")
+        raise typer.Exit(1)
+    text = card_yaml(draft.card)
+    typer.echo("\n" + text, nl=False)  # unwrapped, so it pastes as a card file
+    if save:
+        words = re.sub(r"[^a-z0-9]+", " ", draft.card.title.lower()).split()
+        path = _cards().path("-".join(words[:6]))
+        if path.exists():
+            console.print(f"[red]{path} already exists; not overwriting[/red]")
+            raise typer.Exit(1)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(text)
+        console.print(f"\nWrote [bold]{path}[/bold]")
+
+
 @card_app.command("functions")
 def card_functions(name: str | None = typer.Argument(None)):
     """The function catalog, or one entry with its caveat."""
