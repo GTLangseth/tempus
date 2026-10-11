@@ -4,7 +4,15 @@ from datetime import UTC, datetime, timedelta
 import pytest
 
 from tempus import transfer
-from tempus.transfer import SchemaMismatch, copy_rows, plan_push, select_keys, shared_columns
+from tempus.transfer import (
+    SchemaMismatch,
+    UnpushedWork,
+    copy_rows,
+    plan_push,
+    pull,
+    select_keys,
+    shared_columns,
+)
 
 T0 = datetime(2026, 10, 1, tzinfo=UTC)
 LATER = T0 + timedelta(days=1)
@@ -184,3 +192,93 @@ def test_transfer_has_no_side_effects_when_planning(dev_conn, prod_conn):
     plan_push(dev_conn, prod_conn)
     assert prod_conn.execute("SELECT count(*) AS n FROM series").fetchone()["n"] == 0
     assert transfer.TransferError  # exported for the CLI
+
+
+def series_ids(conn):
+    return [r["series_id"] for r in conn.execute("SELECT series_id FROM series ORDER BY 1")]
+
+
+def test_full_pull_replaces_dev(dev_conn, prod_conn):
+    add_series(dev_conn, "OLD", upstream=None, synced=None)  # snapshot-only: nothing to push
+    add_series(prod_conn, "A", points=4)
+    add_series(prod_conn, "B", points=2)
+    result = pull(dev_conn, prod_conn)
+    assert series_ids(dev_conn) == ["A", "B"]
+    assert obs(dev_conn, "A") == obs(prod_conn, "A")
+    assert result.rows == {"series": 2, "observations": 6, "series_concepts": 0}
+
+
+def test_pull_refuses_while_dev_holds_unpushed_syncs(dev_conn, prod_conn):
+    add_series(prod_conn, "A", upstream=T0)
+    add_series(dev_conn, "A", upstream=LATER, values_from=10)  # a backfill not pushed yet
+    with pytest.raises(UnpushedWork, match="push them first") as exc:
+        pull(dev_conn, prod_conn)
+    assert [e.key for e in exc.value.plan.entries] == [("fred", "A")]
+    assert obs(dev_conn, "A")[0][1] == 10  # dev untouched
+    pull(dev_conn, prod_conn, discard_local=True)
+    assert obs(dev_conn, "A")[0][1] == 0
+
+
+def test_narrowed_pull_leaves_other_dev_series_alone(dev_conn, prod_conn):
+    add_series(dev_conn, "KEEP", upstream=None, synced=None)
+    add_series(prod_conn, "A")
+    add_series(prod_conn, "B")
+    pull(dev_conn, prod_conn, [("fred", "A")])
+    assert series_ids(dev_conn) == ["A", "KEEP"]
+
+
+def test_pull_keeps_dev_series_prod_lacks(dev_conn, prod_conn):
+    add_series(dev_conn, "DEVONLY", upstream=None, synced=None, points=2)
+    add_series(prod_conn, "A")
+    result = pull(dev_conn, prod_conn, [("fred", "A"), ("fred", "DEVONLY")])
+    assert result.missing == [("fred", "DEVONLY")]
+    assert len(obs(dev_conn, "DEVONLY")) == 2
+
+
+def test_metadata_only_pull_copies_no_observations(dev_conn, prod_conn):
+    add_series(prod_conn, "A")
+    result = pull(dev_conn, prod_conn, metadata_only=True)
+    assert series_ids(dev_conn) == ["A"] and obs(dev_conn, "A") == []
+    assert "observations" not in result.rows
+
+
+def test_pull_merges_prod_filings_under_the_branch_tree(dev_conn, prod_conn):
+    for cid in ("labor", "gone"):
+        add_concept(prod_conn, cid)
+    for sid, cid in (("A", "labor"), ("B", "gone"), ("C", "labor")):
+        add_series(prod_conn, sid, points=0)
+        place(prod_conn, sid, cid, "auto")
+
+    def prepare(conn):  # stands in for `ontology load`: this branch's tree and a pin
+        add_concept(conn, "labor")
+        add_concept(conn, "pinned")
+        place(conn, "C", "pinned", "manual")
+
+    result = pull(dev_conn, prod_conn, prepare=prepare)
+    rows = dev_conn.execute(
+        "SELECT series_id, concept_id, method FROM series_concepts ORDER BY 1"
+    ).fetchall()
+    assert [(r["series_id"], r["concept_id"], r["method"]) for r in rows] == [
+        ("A", "labor", "auto"),
+        ("C", "pinned", "manual"),  # a pin from git beats prod's filing
+    ]
+    assert result.skipped_placements == 1  # B's concept isn't in this branch's tree
+
+
+def test_prepare_runs_after_series_arrive(dev_conn, prod_conn):
+    add_series(prod_conn, "A")
+    seen = []
+    pull(dev_conn, prod_conn, prepare=lambda c: seen.append(series_ids(c)))
+    assert seen == [["A"]]
+
+
+def test_failed_pull_leaves_dev_untouched(dev_conn, prod_conn):
+    add_series(dev_conn, "OLD", upstream=None, synced=None)
+    add_series(prod_conn, "A")
+
+    def boom(conn):
+        raise RuntimeError("ontology failed to load")
+
+    with pytest.raises(RuntimeError):
+        pull(dev_conn, prod_conn, prepare=boom)
+    assert series_ids(dev_conn) == ["OLD"]

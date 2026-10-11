@@ -6,6 +6,7 @@ Only `auto` placements (Jev filings) move: pins and drafts come from git on each
 When SPA-16 adds `jev_decisions`, it joins pull and push as an insert-only table.
 """
 
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from typing import Literal
 
@@ -217,3 +218,99 @@ def plan_push(
     plan.prod_ahead.sort()
     plan.skipped_placements.sort()
     return plan
+
+
+class UnpushedWork(TransferError):
+    def __init__(self, plan: PushPlan):
+        self.plan = plan
+        super().__init__(
+            f"dev holds {len(plan.entries)} series or filings prod doesn't: "
+            "push them first (tempus db push --yes), or pull with --discard-local"
+        )
+
+
+@dataclass(frozen=True)
+class PullResult:
+    rows: dict[str, int]
+    skipped_placements: int  # prod filings into concepts this branch's tree lacks
+    missing: list[Key]  # asked for, but not on prod: dev's copy kept
+
+
+def _nothing(conn: psycopg.Connection) -> None:
+    pass
+
+
+def _set_clause(cols: list[str]) -> sql.Composable:
+    return sql.SQL(", ").join(
+        sql.SQL("{c} = EXCLUDED.{c}").format(c=sql.Identifier(c))
+        for c in cols
+        if c not in ("source", "series_id")
+    )
+
+
+def pull(
+    dev: psycopg.Connection,
+    prod: psycopg.Connection,
+    keys: list[Key] | None = None,
+    *,
+    metadata_only: bool = False,
+    discard_local: bool = False,
+    prepare: Callable[[psycopg.Connection], None] = _nothing,
+) -> PullResult:
+    """Replace dev's copy of the selected series with prod's, in one dev transaction.
+
+    `prepare(dev)` rebuilds the git-derived tables (concepts, pins, drafts, cards) once the
+    series are in and before prod's filings merge in, so filings land only under concepts
+    this branch's tree has.
+    """
+    missing: list[Key] = []
+    if keys is not None:
+        on_prod = set(_series_state(prod, keys, synced_only=False))
+        missing = [k for k in keys if k not in on_prod]
+        keys = [k for k in keys if k in on_prod]
+    if not discard_local:
+        plan = plan_push(dev, prod, keys)
+        if plan:
+            raise UnpushedWork(plan)
+    series_cols = shared_columns(dev, prod, "series")
+    obs_cols = shared_columns(dev, prod, "observations")
+    placement_cols = shared_columns(dev, prod, "series_concepts")
+    w, p = _where(keys)
+    rows: dict[str, int] = {}
+    with dev.transaction():
+        if keys is None:
+            dev.execute("TRUNCATE observations, series_concepts, series")
+        else:
+            dev.execute(sql.SQL("DELETE FROM series WHERE {w}").format(w=w), p)  # cascades
+        rows["series"] = copy_rows(prod, dev, "series", series_cols, w, p)
+        if not metadata_only:
+            rows["observations"] = copy_rows(prod, dev, "observations", obs_cols, w, p)
+        prepare(dev)
+        dev.execute(
+            "CREATE TEMP TABLE _pull_placements (LIKE series_concepts INCLUDING DEFAULTS)"
+            " ON COMMIT DROP"
+        )
+        auto = sql.SQL("method = 'auto' AND {w}").format(w=w)
+        copy_rows(prod, dev, "series_concepts", placement_cols, auto, p, into="_pull_placements")
+        cols = sql.SQL(", ").join(map(sql.Identifier, placement_cols))
+        rows["series_concepts"] = dev.execute(
+            sql.SQL(
+                """
+                INSERT INTO series_concepts ({cols}) SELECT {cols} FROM _pull_placements t
+                WHERE (t.concept_id IS NULL
+                       OR EXISTS (SELECT 1 FROM concepts c WHERE c.id = t.concept_id))
+                  AND EXISTS (SELECT 1 FROM series s
+                              WHERE s.source = t.source AND s.series_id = t.series_id)
+                ON CONFLICT (source, series_id) DO UPDATE SET {sets}
+                WHERE series_concepts.method <> 'manual'
+                """
+            ).format(cols=cols, sets=_set_clause(placement_cols))
+        ).rowcount
+        skipped = dev.execute(
+            """
+            SELECT count(*) AS n FROM _pull_placements t
+            WHERE t.concept_id IS NOT NULL
+              AND NOT EXISTS (SELECT 1 FROM concepts c WHERE c.id = t.concept_id)
+            """
+        ).fetchone()["n"]
+    return PullResult(rows, skipped, missing)
