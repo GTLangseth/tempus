@@ -74,8 +74,9 @@ def compare_card(refs: list[str], meta: Meta, mode: str | None) -> Card:
     titles = [row.get("title") or ref for ref, row in zip(refs, rows, strict=True)]
     short = [_short(row, ref) for ref, row in zip(refs, rows, strict=True)]
     # FRED reuses a title across frequencies (DGS10, GS10): the id tells them apart.
+    shared = {t for t in titles if titles.count(t) > 1}
     for i, ref in enumerate(refs):
-        if titles.count(titles[i]) > 1:
+        if titles[i] in shared:
             series_id = ref.split(":", 1)[1]
             titles[i], short[i] = f"{titles[i]} ({series_id})", f"{short[i]} ({series_id})"
     return Card.model_validate(
