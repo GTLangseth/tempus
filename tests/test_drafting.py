@@ -162,8 +162,8 @@ def test_ratio_divides_with_the_finer_series_resampled():
     }
 
 
-MORTGAGE = {"title": "30-Year Mortgage Rate", "units": "Percent", "frequency": "Weekly, Ending Thursday",
-            "observation_start": "1971-04-02"}  # fmt: skip
+MORTGAGE = {"title": "30-Year Mortgage Rate", "units": "Percent",
+            "frequency": "Weekly, Ending Thursday", "observation_start": "1971-04-02"}  # fmt: skip
 TEN_YEAR = {"title": "10-Year Treasury", "units": "Percent", "frequency": "Daily",
             "observation_start": "1962-01-02"}  # fmt: skip
 
