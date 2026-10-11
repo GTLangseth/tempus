@@ -121,6 +121,7 @@ def test_read_only_turns_sync_on_open_off(conn, settings):
     page = client.get("/api/series/fred/DGS10").json()
     assert source.calls == 0 and page["sync"] is None
     assert page["hint"] == "tempus catalog add fred DGS10 --sync  # on the home base"
+    assert page["read_only"] is True
 
 
 def test_writable_app_still_syncs_on_open(conn, settings):

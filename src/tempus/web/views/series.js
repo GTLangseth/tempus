@@ -60,6 +60,7 @@ export class SeriesView {
             <span class="label"><mark>not synced yet</mark></span>
             <p>Only the metadata is here; this series came from the FRED snapshot.
               ${page.sync?.status === "failed" ? `Syncing on open failed: <code>${esc(page.sync.error)}</code>.` :
+                page.read_only ? "This app is read-only, so it won't sync on open. Sync it on the home base:" :
                 "Add a <code>FRED_API_KEY</code> to <code>.env</code> to sync on open, or run:"}</p>
             <div class="cmd"><code>${esc(page.hint)}</code><button class="btn ghost copy" type="button">Copy</button></div>
           </div>`}

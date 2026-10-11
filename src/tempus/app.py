@@ -161,6 +161,7 @@ def create_app(
             raise HTTPException(404, f"no series {source}:{series_id}")
         if read_only and page["hint"]:
             page["hint"] = f"{page['hint']}  # on the home base"
+        page["read_only"] = read_only
         return page
 
     @app.get("/api/events")
