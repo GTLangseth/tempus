@@ -409,3 +409,25 @@ def test_drafter_says_when_no_series_fills_a_role(conn):
     draft = JevDrafter(conn, ScriptedJev(shape_menu(level=0.9))).draft("bananas")
     assert draft.picks == [] and draft.card is None
     assert draft.error == "no series found for the measure"
+
+
+def test_card_draft_eval_offline_checks_the_real_eval_file(monkeypatch):
+    from pathlib import Path
+
+    from typer.testing import CliRunner
+
+    from tempus.cli import app
+
+    monkeypatch.chdir(Path(__file__).parents[1])
+    result = CliRunner().invoke(app, ["card", "draft", "--eval", "--offline"])
+    assert result.exit_code == 0, result.output
+    assert "eval cases check clean" in result.output
+
+
+def test_card_draft_needs_a_question_or_eval():
+    from typer.testing import CliRunner
+
+    from tempus.cli import app
+
+    result = CliRunner().invoke(app, ["card", "draft"])
+    assert result.exit_code == 2 and "give a question, or --eval" in result.output

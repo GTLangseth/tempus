@@ -9,14 +9,14 @@ from collections.abc import Callable, Sequence
 from dataclasses import asdict, dataclass, field
 from datetime import UTC, datetime
 from statistics import mean
-from typing import Literal, Protocol
+from typing import Literal
 
 import psycopg
 
 from tempus.cards.check import check_card
 from tempus.cards.errors import CardError
 from tempus.cards.run import run_spec
-from tempus.drafting import SHAPES, Draft
+from tempus.drafting import SHAPES, Draft, Drafter
 from tempus.evals import Case
 
 Stage = Literal["shape", "series", "valid", "renders"]
@@ -35,10 +35,6 @@ class Grade:
     def past(self, stage: Stage) -> bool:
         """Whether this draft got past `stage`."""
         return self.passed or STAGES.index(self.stage) > STAGES.index(stage)
-
-
-class Drafter(Protocol):
-    def draft(self, question: str) -> Draft: ...
 
 
 def grade(case: Case, draft: Draft, conn: psycopg.Connection | None) -> Grade:
