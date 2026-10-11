@@ -227,7 +227,7 @@ SHAPES: dict[str, Shape] = {
             "change",
             "Asks how fast one measure is rising or falling: its growth rate, its change over a "
             "year, or how hot or cool it is running (inflation, growth, wage gains).",
-            ("the measure",),
+            ("the measure itself, as a level or index rather than a rate of change",),
             True,
             _change,
         ),
