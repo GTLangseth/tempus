@@ -12,6 +12,7 @@ from tempus.navigate import LexicalChooser, navigate
 from tempus.sources.base import Observation, SeriesMeta
 
 from .cards.seed import seed
+from .conftest import TEST_DB
 
 
 def _snapshot_series(conn, series_id="DGS10", title="10-Year Treasury Yield", concept="prices"):
@@ -126,7 +127,7 @@ def test_series_page_unknown(conn):
 @pytest.fixture
 def client(tmp_path: Path):
     (tmp_path / "cards").mkdir()
-    url = make_conninfo(get_settings().database_url, dbname="tempus_test")
+    url = make_conninfo(get_settings().database_url, dbname=TEST_DB)
     return TestClient(create_app(Settings(database_url=url, cards_path=tmp_path / "cards")))
 
 
@@ -162,7 +163,7 @@ def test_navigate_uses_jev_when_a_key_is_set(conn, tmp_path, monkeypatch, fail, 
 
     seed(conn)
     monkeypatch.setattr(tempus.app, "JevClient", lambda key: _FakeJev(key, fail))
-    url = make_conninfo(get_settings().database_url, dbname="tempus_test")
+    url = make_conninfo(get_settings().database_url, dbname=TEST_DB)
     settings = Settings(database_url=url, cards_path=tmp_path, typesafe_api_key="k")
     nav = TestClient(create_app(settings)).get("/api/navigate", params={"q": "x"}).json()
     assert nav["chooser"].startswith(label)

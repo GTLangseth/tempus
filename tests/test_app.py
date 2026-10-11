@@ -9,6 +9,7 @@ from tempus.cards.repository import FileCardRepository
 from tempus.config import Settings, get_settings
 
 from .cards.seed import seed
+from .conftest import TEST_DB
 
 LEAD = Path(__file__).parent / "cards" / "fixtures" / "lead.yaml"
 
@@ -22,7 +23,7 @@ def settings(tmp_path: Path):
     (tmp_path / "cards").mkdir()
     (tmp_path / "cards" / "lead.yaml").write_text(_lead_card())
     (tmp_path / "cards" / "broken.yaml").write_text("title: [oops\n")
-    url = make_conninfo(get_settings().database_url, dbname="tempus_test")
+    url = make_conninfo(get_settings().database_url, dbname=TEST_DB)
     return Settings(database_url=url, cards_path=tmp_path / "cards")
 
 

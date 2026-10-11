@@ -1,6 +1,8 @@
 """Shared fixtures. `conn` is a throwaway `tempus_test` database; tests using it skip when the
 database isn't reachable (start it with `mise run db:up`)."""
 
+import os
+
 import psycopg
 import pytest
 from psycopg.conninfo import make_conninfo
@@ -8,7 +10,8 @@ from psycopg.conninfo import make_conninfo
 from tempus import db
 from tempus.config import get_settings
 
-TEST_DB = "tempus_test"
+# TEMPUS_TEST_DB lets parallel runs (e.g. agents in separate worktrees) share one Postgres.
+TEST_DB = os.environ.get("TEMPUS_TEST_DB", "tempus_test")
 
 
 @pytest.fixture(autouse=True)
@@ -54,11 +57,11 @@ def conn():
 
 @pytest.fixture
 def dev_conn():
-    """The dev side of a pull or push (`tempus_test_dev`)."""
-    yield from _schema_conn("tempus_test_dev")
+    """The dev side of a pull or push (`<TEST_DB>_dev`)."""
+    yield from _schema_conn(f"{TEST_DB}_dev")
 
 
 @pytest.fixture
 def prod_conn():
-    """The prod side of a pull or push (`tempus_test_prod`)."""
-    yield from _schema_conn("tempus_test_prod")
+    """The prod side of a pull or push (`<TEST_DB>_prod`)."""
+    yield from _schema_conn(f"{TEST_DB}_prod")
