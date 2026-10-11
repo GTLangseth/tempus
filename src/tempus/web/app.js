@@ -1,7 +1,9 @@
-// The tempus app: a hash router over three views. Explore (the default) is the 3D concept
-// tree with natural-language search; series pages show one series; cards hot-reload over
-// /api/events. Layout and tokens follow docs/DESIGN.md (Neon Notebook).
+// The tempus app: a hash router over four views. Explore (the default) is the 3D concept
+// tree with natural-language search; series pages show one series; drafts turn a question
+// into a card; cards hot-reload over /api/events. Layout and tokens follow docs/DESIGN.md
+// (Neon Notebook).
 import { CardsView } from "./views/cards.js";
+import { DraftView } from "./views/draft.js";
 import { ExploreView } from "./views/explore.js";
 import { SeriesView } from "./views/series.js";
 
@@ -23,7 +25,7 @@ if (meta.remote) {
   document.querySelector("header .brand").after(badge);
 }
 
-const VIEWS = { explore: ExploreView, series: SeriesView, cards: CardsView };
+const VIEWS = { explore: ExploreView, series: SeriesView, cards: CardsView, draft: DraftView };
 const outlet = document.getElementById("view");
 let active = null; // {kind, view}
 
@@ -32,6 +34,7 @@ export function parse(hash) {
   switch (parts[0]) {
     case "series": return { kind: "series", source: parts[1], id: parts.slice(2).join("/") };
     case "cards": return { kind: "cards", card: parts[1] || null };
+    case "draft": return { kind: "draft", question: parts.slice(1).join("/") };
     case "ask": return { kind: "explore", view: "ask", query: parts.slice(1).join("/") };
     case "explore": return { kind: "explore", concept: parts[1] || null };
     default: return { kind: "explore", concept: null };
@@ -41,7 +44,7 @@ export function parse(hash) {
 async function route() {
   const r = parse(location.hash);
   document.querySelectorAll("header nav a").forEach((a) =>
-    a.classList.toggle("active", a.dataset.view === (r.kind === "series" ? "explore" : r.kind)));
+    a.classList.toggle("active", a.dataset.view === (r.kind === "series" || r.kind === "draft" ? "explore" : r.kind)));
   document.body.dataset.view = r.kind;
   if (active?.kind === r.kind) return active.view.update(r);
   active?.view.unmount();
