@@ -119,3 +119,8 @@ deleted. This picks up revisions to economic data, which happen often.
 
 Implement the `Source` protocol in `src/tempus/sources/base.py` (`fetch_meta`,
 `fetch_observations`), then register it in `sources/__init__.py`.
+
+## License
+
+Dual-licensed under the [MIT License](LICENSE-MIT) or the
+[Apache License, Version 2.0](LICENSE-APACHE), at your option.
