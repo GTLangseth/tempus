@@ -9,9 +9,16 @@ node_modules/
 .next/
 .DS_Store
 
-# Locally installed agent skills
-.agents/
-.claude/skills/
+# Local source documents for readings (copyrighted PDFs stay untracked)
+readings/sources/
+
+# Locally installed agent skills (keep repo-owned skills tracked)
+.agents/*
+!.agents/skills/
+.agents/skills/*
+!.agents/skills/digest-article/
+.claude/skills/*
+!.claude/skills/digest-article
 skills-lock.json
 .claude/settings.local.json
 .claude/worktrees/

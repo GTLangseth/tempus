@@ -28,7 +28,7 @@ and the quarterly review procedure live in [`STACK.md`](STACK.md).
 |---|---|---|---|
 | Database | ✅ built | `docker-compose.yml`, `src/tempus/schema.sql` | TimescaleDB (`timescaledb-ha:pg18`) in Docker; the single store everything reads from |
 | Sources | ✅ FRED | `src/tempus/sources/` | One adapter per provider behind the `Source` protocol (`fetch_meta`, `fetch_observations`) |
-| Sync engine | ✅ built | `src/tempus/sync.py` | Reconciles a source's series into the database and logs each attempt to `sync_runs` |
+| Sync engine | ✅ built | `src/tempus/sync.py` | Reconciles series from `catalog.toml` and dynamically `tracked` DB rows into `series` / `observations` and logs each attempt to `sync_runs` |
 | Catalog | ✅ built | `catalog.toml` | Declarative, git-tracked list of the series to keep synced |
 | Snapshot import | ✅ built | `data/fred/series-snapshot.json`, `src/tempus/snapshot.py` | `tempus catalog import-snapshot`: metadata for ~2,000 popular FRED series into `series`, no observations, so the tree has something to browse before anything is synced |
 | Ontology | ✅ built | `ontology/concepts.yaml`, `src/tempus/ontology.py` | Git-tracked concept tree of *what is measured* (174 concepts, 3–4 levels); mirrored into the `concepts` table |
@@ -40,10 +40,12 @@ and the quarterly review procedure live in [`STACK.md`](STACK.md).
 | CLI | ✅ built | `src/tempus/cli.py` | `tempus` commands for data actions: sync, catalog, inspect, search, resolve |
 | Repo tooling | ✅ built | `mise.toml` | Pins tools (Python, uv, Node) and runs repo tasks (setup, db, test, lint) |
 | Home base | 🟡 runbook ready | `docs/HOMEBASE.md`, `scripts/homebase/` | Mac mini on Tailscale: real DB and keys, `tempus serve` under launchd published with `tailscale serve`, SSH + tmux for agents from the phone (`mise run homebase:setup`); opt-in password-gated sharing via Funnel (`mise run share:on`) |
-| Dev and prod databases | ✅ built | `src/tempus/remote.py`, `src/tempus/transfer.py` | `tempus db pull/push/where` and `TEMPUS_DB=prod`: an SSH tunnel to the home base's Postgres. Pull replaces dev's copy; push merges whole series and Jev placements into prod, never deleting; read-only mode serves local code over prod as `tempus_ro` |
+| Dev and prod databases | ✅ built | `src/tempus/remote.py`, `src/tempus/transfer.py` | `tempus db pull/push/where` and `TEMPUS_DB=prod`: an SSH tunnel to the home base's Postgres. Pull replaces dev's copy (including dynamic `cards` and `readings`); push merges whole series, Jev placements, and newer dynamic cards/readings into prod without deleting |
 | Scheduler | 🟡 minimal | `tempus sync --every 6h` | A blocking loop for now; see open questions |
-| Cards | ✅ built | `cards/`, `src/tempus/cards/` | Card language v1 (inputs, formulas, panels), static checks, Polars engine, panel payloads |
-| App | ✅ built | `src/tempus/app.py`, `src/tempus/explore.py`, `src/tempus/web/` | `tempus serve`: FastAPI engine API + no-build static front end (ECharts, three.js), hot reload |
+| Cards | ✅ built | `src/tempus/cards/`, `cards/*.yaml`, `cards` table | Card language v1 (`DbCardRepository` in DB mode, fallback to repo seed `cards/*.yaml`), static checks, Polars engine, panel payloads |
+| Readings | ✅ built | `src/tempus/readings.py`, `readings` table, `src/tempus/web/views/readings.js`, `.agents/skills/digest-article/` | Postgres-backed Markdown digests (`DbReadingRepository` + `FileReadingRepository`) with verified claim callouts, embedded cards, `tempus reading` CLI, SSE updates, and UI delete |
+| Ingestion pipeline | ✅ built | `src/tempus/llm.py`, `src/tempus/ingest.py` | Pluggable `httpx` LLM extraction (Gemini / Anthropic) + URL HTML parser + `navigate` / FRED auto-sync & `mark_tracked` + SQL-grounded card composition with `JevDrafter` fallback, tracked in `ingest_jobs` |
+| App | ✅ built | `src/tempus/app.py`, `src/tempus/explore.py`, `src/tempus/web/` | `tempus serve`: FastAPI engine API + no-build static front end (ECharts, three.js), thread-safe `_EventHub` SSE + file watch, and `/api/ingest` |
 | Web front end | ✅ explore, series and cards views | see App | Explore (default): the concept tree in 3D with natural-language search, or an outline on small screens. Series pages: an implicit single-series card. Cards: saved cards, hot-reloaded |
 | Design system | ✅ adopted | `docs/DESIGN.md`, `docs/design/` | Visual tokens and rules for every surface (design.md format); `docs/design/` holds the reference candidates, a static preview and a playground for choosing options. `src/tempus/web/theme.json` mirrors its tokens |
 
@@ -63,23 +65,23 @@ ontology/placements.draft.yaml ──▶ tempus ontology load
                             └──▶ tempus ontology file ──▶ Jev (TypeSafe API)
                      │
                      ▼
-cards/*.yaml ──▶ card engine (check · resolve · evaluate · render) ──▶ panel payloads ──▶ tempus serve ──▶ browser
-                                                                        /api/explore · /api/navigate · /api/series
+cards (DB / seed YAML) ──▶ card engine (check · resolve · evaluate) ──▶ /api/cards ──────▶ tempus serve ──▶ browser
+readings (DB / .md)    ──▶ readings (parse · check · run_reading) ─▶ /api/readings ───▶ Readings view (SSE)
+PDF / URL / Text / .md ──▶ POST /api/ingest ──▶ llm (Gemini/Anthropic) + FRED sync ─▶ ingest_jobs + Postgres
 
 question ──▶ tempus card draft ──▶ Jev: shape ──▶ navigate per role ──▶ shape builder ──▶ v1 card
 evals/drafting.yaml ──▶ tempus card draft --eval ──▶ grade by stage ──▶ report (evals/baselines/*.json)
 
 dev DB (MacBook) ◀── tempus db pull ──┐
                                       ├── ssh -L via homebase ──▶ prod DB (home base)
-dev DB (MacBook) ── tempus db push ───┘   (TEMPUS_DB=prod: read prod directly, as tempus_ro)
+dev DB (MacBook) ── tempus db push ───┘   (series · observations · Jev · dynamic cards & readings)
 ```
 
 ## Data model
 
-- **`series`** has one row per `(source, series_id)`: metadata, plus `upstream_updated_at`
-  (when the provider last revised the series) and `last_synced_at`. Rows from the snapshot
-  import have both NULL and no observations until synced; the snapshot's own fields
-  (popularity, coverage, short codes, its `last_updated`) sit in `extra`.
+- **`series`** has one row per `(source, series_id)`: metadata, `upstream_updated_at`,
+  `last_synced_at`, and `tracked` (`true` for series dynamically synced by ingestion/Keep so
+  `tempus sync` refreshes them without modifying `catalog.toml`).
 - **`observations`** maps `(source, series_id, ts)` to `value`. It's a hypertable on `ts`.
   `value` is NULL where the provider reports a missing point.
 - **`sync_runs`** is an append-only log of sync attempts and their outcomes.
@@ -88,9 +90,14 @@ dev DB (MacBook) ── tempus db push ───┘   (TEMPUS_DB=prod: read prod
   lowest probability along the path, plus a trail of each level's decision) or `draft` (from
   `ontology/placements.draft.yaml`; the trail records `low` when it was a judgment call).
   Precedence is manual > auto > draft. A NULL concept means nothing fit at the top level.
-- **`cards`** is an index of `cards/*.yaml` (the files are the source of truth): id, title,
-  question, tags, concepts, the parsed spec as `jsonb`, and a file hash. Rebuilt by
-  `tempus card load`.
+- **`cards`** holds saved card specs (`id`, `title`, `question`, `tags`, `concepts`, `spec` jsonb,
+  `yaml_text`, `file_hash`, `updated_at`). Git seed cards loaded via `tempus card load` have
+  `yaml_text IS NULL`; dynamic DB cards saved by `DbCardRepository` / ingestion store full
+  `yaml_text`.
+- **`readings`** holds full frontmatter + Markdown (`body_md`), indexed metadata (`title`,
+  `source`, `published`, `topics`, `concepts`, `card_ids`, `source_url`), and `status` / `origin`.
+- **`ingest_jobs`** tracks async ingestion runs (`kind`, `status`, `step`, `error`, `reading_id`,
+  `card_ids`).
 
 Each series is identified by the pair `(source, series_id)`, so the same ID can exist at
 two different providers without colliding.
@@ -166,6 +173,25 @@ By the horizon in [`SOUL.md`](SOUL.md) where it first matters. Status: ✅ built
 ## Decisions
 
 Newest first. Each entry: what we chose, and why.
+
+- **2026-11-25 · Postgres as dynamic source of truth & pluggable auto-ingestion (SPA-49).**
+  Dynamic readings, ingested cards, and dynamically synced FRED series (`series.tracked`) live
+  in TimescaleDB (`readings`, `cards.yaml_text`, `ingest_jobs`) rather than git working-tree
+  files, behind `DbCardRepository` / `DbReadingRepository` (`TEMPUS_STORAGE=db`, with fallback
+  reads of repo seed `cards/*.yaml`). Automatic ingestion (`#/readings/new`, `POST /api/ingest`)
+  uses a pluggable `httpx` LLM client (`GeminiIngestLLM` / `AnthropicIngestLLM`, zero new SDK
+  dependencies), searches and syncs FRED series on demand, composes SQL-grounded card specs with
+  `JevDrafter` fallback, and syncs between dev and Home Base via `tempus db pull/push`. Spec:
+  `docs/specs/2026-11-25-dynamic-readings-and-ingest-design.md`.
+
+- **2026-11-25 · Card-backed Markdown readings (`readings/*.md`) for research digests (SPA-48).**
+  External research articles are digested into `readings/<id>.md` (YAML front matter `version: 1`,
+  prose, fenced `claim` verdicts `confirmed | extended | nuanced | unverified`, and fenced `card`
+  embeds). All formulas and charts stay inside ordinary `cards/*.yaml` files rather than inventing
+  a second calculation engine, and `FileReadingRepository` sits behind a `ReadingRepository` seam
+  without a database table yet. Ingestion runs via `.agents/skills/digest-article` using `tempus`
+  CLI tools (zero new runtime dependencies). Spec:
+  `docs/specs/2026-11-25-article-readings-design.md`.
 
 - **2026-10-11 · Drafting and comparing in the app; `tempus serve` writes cards (SPA-43 phase 2).**
   Explore can draft a card from a question (swap any pick for a runner-up without asking Jev

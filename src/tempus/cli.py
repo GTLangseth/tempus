@@ -16,7 +16,7 @@ from tempus.filing import file_series
 from tempus.jev import JevClient, JevError
 from tempus.sources import SOURCE_NAMES, get_source
 from tempus.sources.fred import FredError
-from tempus.sync import sync_series
+from tempus.sync import sync_series, tracked_series
 
 app = typer.Typer(help="Tempus: collect time-series data into TimescaleDB.", no_args_is_help=True)
 db_app = typer.Typer(help="Database management.", no_args_is_help=True)
@@ -36,6 +36,11 @@ app.add_typer(fred_app, name="fred")
 app.add_typer(ontology_app, name="ontology")
 card_app = typer.Typer(help="Cards: saved views over series (cards/*.yaml).", no_args_is_help=True)
 app.add_typer(card_app, name="card")
+reading_app = typer.Typer(
+    help="Readings: digested research articles enriched with live cards (readings/*.md).",
+    no_args_is_help=True,
+)
+app.add_typer(reading_app, name="reading")
 
 console = Console()
 SPARK = "▁▂▃▄▅▆▇█"
@@ -175,6 +180,13 @@ def _print_plan(plan: transfer.PushPlan) -> None:
                 "Jev placement" if e.placement else "—",
             )
         console.print(table)
+    if plan.cards or plan.readings:
+        content = Table("artifact", "kind", "change")
+        for cid, change in plan.cards:
+            content.add_row(cid, "card", change)
+        for rid, change in plan.readings:
+            content.add_row(rid, "reading", change)
+        console.print(content)
     if plan.prod_ahead:
         console.print(
             f"[yellow]Prod is ahead for {len(plan.prod_ahead)} series (pull them):[/yellow] "
@@ -254,7 +266,7 @@ def db_pull(
     ),
 ):
     """Copy prod's series, observations and Jev placements into the dev database."""
-    from tempus.cards.repository import sync_index
+    from tempus.cards.repository import FileCardRepository, sync_index
 
     started = time.monotonic()
     with _prod(owner=False) as (settings, dev, prod):
@@ -262,7 +274,11 @@ def db_pull(
 
         def prepare(conn):
             _load_ontology(conn, settings, quiet=True)
-            sync_index(conn, _cards())
+            sync_index(
+                conn,
+                FileCardRepository(settings.cards_path),
+                prune=not settings.uses_db_storage,
+            )
 
         try:
             result = transfer.pull(
@@ -313,10 +329,15 @@ def db_push(
             )
             return
         result = transfer.apply_push(dev, prod, plan)
-    console.print(
-        f"[green]Pushed {result.series} series ({result.observations} observations), "
-        f"{result.placements} Jev placements[/green]"
-    )
+    parts = [
+        f"{result.series} series ({result.observations} observations)",
+        f"{result.placements} Jev placements",
+    ]
+    if result.cards:
+        parts.append(f"{result.cards} cards")
+    if result.readings:
+        parts.append(f"{result.readings} readings")
+    console.print(f"[green]Pushed {', '.join(parts)}[/green]")
 
 
 # --- catalog ---------------------------------------------------------------
@@ -407,27 +428,34 @@ def sync(
         None, help="Keep running, syncing on this interval (e.g. 6h). Ctrl-C to stop."
     ),
 ):
-    """Sync series from catalog.toml into the database."""
+    """Sync series from catalog.toml and tracked DB series into the database."""
     settings = get_settings()
     interval = _parse_interval(every) if every else None
 
     while True:
-        entries = [
-            e
-            for e in catalog.load(settings.catalog_path)
-            if (source is None or e.source == source) and (not series or e.id in series)
-        ]
-        if not entries:
-            console.print("[yellow]Nothing to sync.[/yellow] Add series with `tempus catalog add`.")
-            raise typer.Exit(1)
-
         failed = 0
         sources = {}
         with _connect() as conn:
-            for e in entries:
-                if e.source not in sources:
-                    sources[e.source] = _source(e.source, settings)
-                result = sync_series(conn, sources[e.source], e.id, force=force)
+            seen: set[tuple[str, str]] = set()
+            targets: list[tuple[str, str]] = []
+            for s, sid in [
+                *((e.source, e.id) for e in catalog.load(settings.catalog_path)),
+                *tracked_series(conn),
+            ]:
+                if (s, sid) in seen:
+                    continue
+                if (source is None or s == source) and (not series or sid in series):
+                    seen.add((s, sid))
+                    targets.append((s, sid))
+            if not targets:
+                console.print(
+                    "[yellow]Nothing to sync.[/yellow] Add series with `tempus catalog add`."
+                )
+                raise typer.Exit(1)
+            for src_name, sid in targets:
+                if src_name not in sources:
+                    sources[src_name] = _source(src_name, settings)
+                result = sync_series(conn, sources[src_name], sid, force=force)
                 failed += result.status == "failed"
                 _print_result(result)
             _load_ontology(conn, settings, quiet=True)
@@ -774,10 +802,13 @@ panels:                           # see `tempus card panels`
 """
 
 
-def _cards():
-    from tempus.cards.repository import FileCardRepository
+def _cards(*, offline: bool = False):
+    from tempus.cards.repository import DbCardRepository, FileCardRepository
 
-    return FileCardRepository(get_settings().cards_path)
+    settings = get_settings()
+    if offline or not settings.uses_db_storage:
+        return FileCardRepository(settings.cards_path)
+    return DbCardRepository(settings.database_url, fallback_root=settings.cards_path)
 
 
 def _print_card_errors(errors) -> None:
@@ -811,12 +842,13 @@ def card_list():
 @card_app.command("new")
 def card_new(card_id: str):
     """Write a commented template to cards/<id>.yaml."""
+    from tempus.cards.repository import FileCardRepository
     from tempus.cards.spec import CARD_ID
 
     if not CARD_ID.fullmatch(card_id):
         console.print("[red]Card ids are kebab-case, e.g. crude-to-gasoline[/red]")
         raise typer.Exit(1)
-    path = _cards().path(card_id)
+    path = FileCardRepository(get_settings().cards_path).path(card_id)
     if path.exists():
         console.print(f"[red]{path} already exists[/red]")
         raise typer.Exit(1)
@@ -835,7 +867,7 @@ def card_check(
     from tempus.cards.errors import has_errors
     from tempus.cards.resolve import resolve
 
-    repo = _cards()
+    repo = _cards(offline=offline)
     ids = [card_id] if card_id else repo.ids()
     conn = None if offline else _connect()
     failed = False
@@ -895,14 +927,320 @@ def card_show(
 
 @card_app.command("load")
 @writes
-def card_load():
-    """Sync cards/*.yaml into the cards index table."""
-    from tempus.cards.repository import sync_index
+def card_load(
+    prune: bool | None = typer.Option(
+        None,
+        "--prune/--no-prune",
+        help="Drop cards missing from cards/*.yaml (default: true in file mode, false in DB mode)",
+    ),
+):
+    """Sync cards/*.yaml into the cards table."""
+    from tempus.cards.repository import FileCardRepository, sync_index
 
+    settings = get_settings()
+    should_prune = (not settings.uses_db_storage) if prune is None else prune
+    file_repo = FileCardRepository(settings.cards_path)
     with _connect() as conn:
-        loaded, errors = sync_index(conn, _cards())
+        loaded, errors = sync_index(conn, file_repo, prune=should_prune)
     _print_card_errors(errors)
     console.print(f"Loaded {loaded} card(s)")
+
+
+@card_app.command("import")
+@writes
+def card_import(
+    paths: list[Path] = typer.Argument(..., exists=True, dir_okay=False, help="Card YAML files"),
+):
+    """Import cards/*.yaml directly into Postgres (`cards` table)."""
+    from tempus.cards.errors import has_errors
+    from tempus.cards.repository import DbCardRepository
+    from tempus.cards.spec import CARD_ID
+
+    repo = DbCardRepository(get_settings().database_url)
+    imported = 0
+    failed = False
+    for path in paths:
+        cid = path.stem
+        if not CARD_ID.fullmatch(cid):
+            console.print(f"[red]{path}: filename stem '{cid}' must be kebab-case[/red]")
+            failed = True
+            continue
+        errors = repo.save(cid, path.read_text())
+        _print_card_errors(errors)
+        if has_errors(errors):
+            failed = True
+        else:
+            imported += 1
+            console.print(f"[green]✓[/green] imported card {cid}")
+    if failed:
+        raise typer.Exit(1)
+    console.print(f"Imported {imported} card(s)")
+
+
+@card_app.command("delete")
+@writes
+def card_delete(card_id: str):
+    """Delete a dynamically stored card from Postgres."""
+    from tempus.cards.repository import DbCardRepository
+
+    if not DbCardRepository(get_settings().database_url).delete(card_id):
+        console.print(f"[yellow]not in database[/yellow] {card_id}")
+        raise typer.Exit(1)
+    console.print(f"[green]deleted[/green] card {card_id}")
+
+
+# --- readings --------------------------------------------------------------
+
+READING_TEMPLATE = """\
+---
+version: 1
+title: {title}
+authors: ["Author Name"]
+source: Publication
+published: "{published}"
+summary: One-paragraph synthesis of the article's core thesis and what tempus adds.
+concepts: []
+tags: []
+---
+
+## Core thesis
+
+Summarize the argument here, then embed a live card and test claims against stored data.
+
+```claim
+quote: "Exact or closely paraphrased empirical claim from the article."
+status: confirmed
+verdict: What the series in tempus actually show.
+series: [fred:UNRATE]
+```
+
+```card
+card: crude-to-gasoline
+caption: How the live series look today.
+```
+"""
+
+
+def _readings(*, offline: bool = False):
+    from tempus.readings import DbReadingRepository, FileReadingRepository
+
+    settings = get_settings()
+    if offline or not settings.uses_db_storage:
+        return FileReadingRepository(settings.readings_path)
+    return DbReadingRepository(settings.database_url, fallback_root=settings.readings_path)
+
+
+def _print_reading_errors(errors) -> None:
+    from rich.markup import escape
+
+    for e in errors:
+        color = "red" if e.level == "error" else "yellow"
+        console.print(f"[{color}]{escape(e.format())}[/{color}]")
+
+
+def _known_concepts(settings: Settings, conn=None) -> set[str] | None:
+    if conn is not None:
+        rows = conn.execute("SELECT id FROM concepts").fetchall()
+        if rows:
+            return {r["id"] for r in rows}
+    if settings.ontology_path.exists():
+        return {c.id for c in ontology.walk(ontology.load(settings.ontology_path))}
+    return None
+
+
+@reading_app.command("list")
+def reading_list():
+    """List digested readings with their embedded card and claim counts."""
+    repo = _readings()
+    table = Table("id", "title", "published", "cards", "claims", "concepts")
+    for rid in repo.ids():
+        reading, _errors = repo.get(rid)
+        if reading is None:
+            table.add_row(rid, "[red]invalid[/red]", "", "", "", "")
+            continue
+        table.add_row(
+            rid,
+            reading.meta.title,
+            reading.meta.published,
+            str(len(reading.card_ids())),
+            str(len(reading.claims())),
+            ", ".join(reading.meta.concepts),
+        )
+    console.print(table)
+
+
+@reading_app.command("new")
+def reading_new(reading_id: str):
+    """Write a starter template to readings/<id>.md."""
+    from datetime import date
+
+    from tempus.readings import READING_ID, FileReadingRepository
+
+    if not READING_ID.fullmatch(reading_id):
+        console.print("[red]Reading ids are kebab-case, e.g. energy-pass-through[/red]")
+        raise typer.Exit(1)
+    path = FileReadingRepository(get_settings().readings_path).path(reading_id)
+    if path.exists():
+        console.print(f"[red]{path} already exists[/red]")
+        raise typer.Exit(1)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(
+        READING_TEMPLATE.format(
+            title=reading_id.replace("-", " ").capitalize(),
+            published=date.today().strftime("%Y-%m"),
+        )
+    )
+    console.print(f"Wrote [bold]{path}[/bold]")
+
+
+@reading_app.command("check")
+def reading_check(
+    reading_id: str | None = typer.Argument(None, help="One reading; all readings if omitted"),
+    offline: bool = typer.Option(False, help="Static checks only, no database"),
+):
+    """Validate readings, embedded cards, and claim series references."""
+    from tempus.readings import check_reading, has_errors
+
+    settings = get_settings()
+    repo = _readings(offline=offline)
+    cards_repo = _cards(offline=offline)
+    ids = [reading_id] if reading_id else repo.ids()
+    if not ids:
+        console.print("[dim]no readings found[/dim]")
+        return
+    conn = None if offline else _connect()
+    known = _known_concepts(settings, conn)
+    failed = False
+    try:
+        for rid in ids:
+            reading, errors = repo.get(rid)
+            if reading is not None:
+                errors = [
+                    *errors,
+                    *check_reading(rid, reading, cards_repo, conn=conn, known_concepts=known),
+                ]
+            _print_reading_errors(errors)
+            if has_errors(errors):
+                failed = True
+            else:
+                console.print(f"[green]✓[/green] {rid}")
+    finally:
+        if conn is not None:
+            conn.close()
+    if failed:
+        raise typer.Exit(1)
+
+
+@reading_app.command("import")
+@writes
+def reading_import(
+    paths: list[Path] = typer.Argument(..., exists=True, dir_okay=False, help="Reading .md files"),
+):
+    """Import Markdown readings directly into Postgres (`readings` table)."""
+    from tempus.readings import (
+        READING_ID,
+        DbReadingRepository,
+        check_reading,
+        has_errors,
+        parse_reading,
+    )
+
+    settings = get_settings()
+    repo = DbReadingRepository(settings.database_url)
+    cards_repo = _cards()
+    imported = 0
+    failed = False
+    with _connect() as conn:
+        known = _known_concepts(settings, conn)
+        for path in paths:
+            rid = path.stem
+            if not READING_ID.fullmatch(rid):
+                console.print(f"[red]{path}: filename stem '{rid}' must be kebab-case[/red]")
+                failed = True
+                continue
+            raw = path.read_text()
+            reading, errors = parse_reading(rid, raw)
+            if reading is not None:
+                errors = [
+                    *errors,
+                    *check_reading(rid, reading, cards_repo, conn=conn, known_concepts=known),
+                ]
+            _print_reading_errors(errors)
+            if reading is None or has_errors(errors):
+                failed = True
+                continue
+            save_errors = repo.save(rid, raw, origin="imported")
+            if has_errors(save_errors):
+                _print_reading_errors(save_errors)
+                failed = True
+                continue
+            imported += 1
+            console.print(f"[green]✓[/green] imported reading {rid}")
+    if failed:
+        raise typer.Exit(1)
+    console.print(f"Imported {imported} reading(s)")
+
+
+@reading_app.command("delete")
+@writes
+def reading_delete(reading_id: str):
+    """Delete a dynamically stored reading from Postgres."""
+    from tempus.readings import DbReadingRepository
+
+    if not DbReadingRepository(get_settings().database_url).delete(reading_id):
+        console.print(f"[yellow]not in database[/yellow] {reading_id}")
+        raise typer.Exit(1)
+    console.print(f"[green]deleted[/green] reading {reading_id}")
+
+
+@reading_app.command("show")
+def reading_show(
+    reading_id: str,
+    as_json: bool = typer.Option(False, "--json", help="Print the evaluated reading payload"),
+):
+    """Inspect a reading with its claim verdicts and embedded card summaries."""
+    import json
+
+    from tempus.readings import has_errors, run_reading
+
+    settings = get_settings()
+    with _connect() as conn:
+        known = _known_concepts(settings, conn)
+        result = run_reading(conn, _readings(), _cards(), reading_id, known_concepts=known)
+    if as_json:
+        print(json.dumps(result, default=str, indent=2))
+        raise typer.Exit(1 if any(e["level"] == "error" for e in result["errors"]) else 0)
+    if result["errors"]:
+        from tempus.readings import ReadingError
+
+        _print_reading_errors([ReadingError(**e) for e in result["errors"]])
+    meta = result["meta"]
+    if meta:
+        byline = ", ".join(meta["authors"])
+        src = f" · {meta['source']}" if meta.get("source") else ""
+        pub = meta["published"]
+        console.print(f"[bold]{meta['title']}[/bold]  [dim]{byline}{src} ({pub})[/dim]")
+        console.print(meta["summary"])
+        counts = " · ".join(f"{k}: {v}" for k, v in result["claim_counts"].items() if v)
+        if counts:
+            console.print(f"[dim]claims: {counts}[/dim]")
+        for b in result["blocks"]:
+            if b["type"] == "claim":
+                console.print(f"\n[{b['status'].upper()}] “{b['quote']}”")
+                console.print(f"  {b['verdict']}")
+                if b["series_info"]:
+                    pts = ", ".join(
+                        f"{s['ref']}={s['latest_value']:.4g} ({s['latest_date']})"
+                        if s["latest_value"] is not None
+                        else s["ref"]
+                        for s in b["series_info"]
+                    )
+                    console.print(f"  [dim]{pts}[/dim]")
+            elif b["type"] == "card":
+                title = (b.get("result") or {}).get("card", {}).get("title") or b["card"]
+                console.print(f"\n[bold]card · {b['card']}[/bold] — {title}")
+    if any(e["level"] == "error" for e in result["errors"]) or (has_errors([]) and meta is None):
+        raise typer.Exit(1)
 
 
 def _eval_cases():
@@ -1014,7 +1352,9 @@ def card_draft(
     text = card_yaml(draft.card)
     typer.echo("\n" + text, nl=False)  # unwrapped, so it pastes as a card file
     if save:
-        repo = _cards()
+        from tempus.cards.repository import FileCardRepository
+
+        repo = FileCardRepository(get_settings().cards_path)
         path = repo.path(card_id(draft.card.title, set(repo.ids())))
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(text)

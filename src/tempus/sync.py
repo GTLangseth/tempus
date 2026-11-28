@@ -130,3 +130,21 @@ def _sync(conn: psycopg.Connection, source: Source, series_id: str, *, force: bo
         ).rowcount
 
     return SyncResult(source.name, series_id, "updated", upserted, deleted)
+
+
+def mark_tracked(
+    conn: psycopg.Connection, source: str, series_id: str, tracked: bool = True
+) -> None:
+    """Mark a synced series as dynamically tracked so incremental sync keeps it fresh."""
+    conn.execute(
+        "UPDATE series SET tracked = %s WHERE source = %s AND series_id = %s",
+        (tracked, source, series_id),
+    )
+
+
+def tracked_series(conn: psycopg.Connection) -> list[tuple[str, str]]:
+    """Return all (source, series_id) pairs marked `tracked = true`."""
+    rows = conn.execute(
+        "SELECT source, series_id FROM series WHERE tracked = true ORDER BY source, series_id"
+    ).fetchall()
+    return [(r["source"], r["series_id"]) for r in rows]

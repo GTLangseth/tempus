@@ -57,7 +57,7 @@ It's safe to re-run. It asks for your password once, then:
   already holds port 5432, it stops and asks you to set `TEMPUS_DB_PORT` and `DATABASE_URL` in
   `.env` to a free port (e.g. 5433)
 - keeps `tempus serve` running with launchd on 127.0.0.1:8765, logging to `~/Library/Logs/tempus/`
-- publishes it to your tailnet with `tailscale serve`
+- publishes it privately to your tailnet devices with `tailscale serve` (including dynamic reading ingestion at `#/readings/new` when `GEMINI_API_KEY` or `ANTHROPIC_API_KEY` is set in `.env`)
 - ends with a list of anything left to do by hand
 
 ### 2. Tailscale admin console (https://login.tailscale.com/admin)
@@ -206,7 +206,8 @@ your phone with Wi-Fi off, not from the mini itself.
 | Update to latest main | `git pull && uv sync && uv run tempus db init && launchctl kickstart -k gui/$(id -u)/com.tempus.serve` |
 | App logs | `tail -f ~/Library/Logs/tempus/com.tempus.serve.log` |
 | Stop / start the app | `launchctl bootout gui/$(id -u)/com.tempus.serve` / re-run `mise run homebase:setup` |
-| Sync now | `uv run tempus sync` |
+| Sync now (catalog + tracked series) | `uv run tempus sync` |
+| Push / pull dynamic readings & cards | `uv run tempus db push [--yes]` / `uv run tempus db pull` |
 | Share with colleagues | `mise run share:on` / `share:off` / `share:status` |
 
 ## Unattended restarts

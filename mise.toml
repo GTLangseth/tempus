@@ -95,7 +95,7 @@ run = "uv run pytest"
 
 [tasks.lint]
 description = "Lint and format-check"
-run = ["uv run ruff check .", "uv run ruff format --check .", "uv run tempus card check --offline", "uv run tempus card draft --eval --offline"]
+run = ["uv run ruff check .", "uv run ruff format --check .", "uv run tempus card check --offline", "uv run tempus card draft --eval --offline", "uv run tempus reading check --offline"]
 
 [tasks."design:lint"]
 description = "Validate docs/DESIGN.md against the design.md format"

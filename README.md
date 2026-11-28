@@ -50,13 +50,13 @@ Tailscale, agents in `tmux`), follow [docs/HOMEBASE.md](docs/HOMEBASE.md):
 ```sh
 tempus db init | status            # schema / health
 tempus db where                    # dev, or prod read-only (TEMPUS_DB=prod)
-tempus db pull                     # prod's data → dev (--series, --concept, --metadata-only)
-tempus db push [--yes]             # dev's newer syncs + Jev placements → prod (dry run without --yes)
+tempus db pull                     # prod's data + dynamic cards/readings → dev
+tempus db push [--yes]             # dev's newer syncs, Jev & dynamic readings → prod (dry run without --yes)
 tempus db readonly-role            # on the home base: the read-only tempus_ro role
 tempus fred search "mortgage rate" # find series
 tempus catalog add fred MORTGAGE30US --sync
 tempus catalog list | remove fred GDP
-tempus sync                        # sync everything in catalog.toml
+tempus sync                        # sync catalog.toml plus dynamically tracked DB series
 tempus sync -s UNRATE --force      # one series, ignore freshness check
 tempus sync --every 6h             # keep running on an interval
 tempus series list                 # what's stored, coverage, freshness
@@ -78,18 +78,41 @@ entry. Pins override automatic filing.
 ## Cards
 
 A card is a saved view: inputs (series), formulas that combine them, and panels that show
-the result. Cards are YAML files in `cards/`, checked in lint and rendered by `tempus serve`.
+the result. Seed cards live in `cards/*.yaml`; dynamically created or ingested cards live in
+Postgres (`TEMPUS_STORAGE=db`, default) so your library grows without touching git.
 
 ```sh
 tempus card new my-card            # template in cards/my-card.yaml
-tempus card check                  # validate (add --offline to skip the DB)
+tempus card import cards/*.yaml    # import card YAML into Postgres
+tempus card delete my-card         # remove a DB-stored card
+tempus card check                  # validate DB + seed cards (add --offline to skip the DB)
 tempus card show crude-to-gasoline # summary; --json prints the panel payloads
 tempus card functions | panels     # the vocabulary
-tempus serve                       # http://127.0.0.1:8765, reloads when a card is saved
+tempus serve                       # http://127.0.0.1:8765
 ```
 
 See `cards/crude-to-gasoline.yaml` for the format, and
 `docs/specs/2026-10-04-cards-slice-1-design.md` for the full design.
+
+## Readings & Auto-Ingest
+
+A reading digests an external research article into prose, claim verdicts (`confirmed`,
+`extended`, `nuanced`, `unverified`), companion notes, and embedded live cards rendered at
+`#/readings`. New readings can be ingested automatically from **PDF upload**, **URL**, **text**,
+or **Markdown** via `+ Add Article` (`#/readings/new`) using `GEMINI_API_KEY` or
+`ANTHROPIC_API_KEY` + automatic FRED sync.
+
+```sh
+tempus reading new my-article          # starter template in readings/my-article.md
+tempus reading import my-article.md    # import Markdown reading into Postgres
+tempus reading delete my-article       # remove a DB-stored reading
+tempus reading list                    # list readings, card counts, and claim counts
+tempus reading check [--offline]       # validate front matter, card embeds, and series refs
+tempus reading show my-article         # summary and claim verdicts (--json for payloads)
+```
+
+See [docs/specs/2026-11-25-dynamic-readings-and-ingest-design.md](docs/specs/2026-11-25-dynamic-readings-and-ingest-design.md)
+and `.agents/skills/digest-article`.
 
 ## mise tasks
 
@@ -104,11 +127,13 @@ See `cards/crude-to-gasoline.yaml` for the format, and
 
 ## Data model
 
-- `series`: one row per `(source, series_id)` with metadata and `upstream_updated_at`
+- `series`: one row per `(source, series_id)` with metadata, `upstream_updated_at`, and `tracked`
 - `observations`: hypertable on `ts`, `(source, series_id, ts) → value`
 - `sync_runs`: audit log of every sync attempt
 - `concepts` / `series_concepts`: the tree and one placement per series (manual > auto > draft)
-- `cards`: index of `cards/*.yaml`, rebuilt by `tempus card load`
+- `cards`: DB-stored & seed-indexed chart specs (`spec`, `yaml_text`)
+- `readings`: DB-stored Markdown digests (`body_md`, metadata, `card_ids`, `status`, `origin`)
+- `ingest_jobs`: async PDF/URL/Text ingestion status and pipeline steps
 
 **How syncing works:** if the source's `last_updated` hasn't moved, the sync skips
 the download. Otherwise it downloads the full series and reconciles it in one

@@ -13,8 +13,10 @@ CREATE TABLE IF NOT EXISTS series (
     extra               jsonb       NOT NULL DEFAULT '{}'::jsonb,
     upstream_updated_at timestamptz,          -- when the source last revised the series
     last_synced_at      timestamptz,          -- when we last pulled it
+    tracked             boolean     NOT NULL DEFAULT false,
     PRIMARY KEY (source, series_id)
 );
+ALTER TABLE series ADD COLUMN IF NOT EXISTS tracked boolean NOT NULL DEFAULT false;
 
 -- The data points. A hypertable partitioned on ts.
 CREATE TABLE IF NOT EXISTS observations (
@@ -71,14 +73,53 @@ ALTER TABLE series_concepts DROP CONSTRAINT IF EXISTS series_concepts_method_che
 ALTER TABLE series_concepts ADD CONSTRAINT series_concepts_method_check
     CHECK (method IN ('manual', 'auto', 'draft'));
 
--- Index of cards/*.yaml (the files are the source of truth), rebuilt by `tempus card load`.
+-- Cards & readings: Postgres-backed for dynamic articles, also syncable from repo files via `tempus card load` / `import`.
 CREATE TABLE IF NOT EXISTS cards (
-    id         text        PRIMARY KEY,                  -- the file name, kebab-case
+    id         text        PRIMARY KEY,                  -- kebab-case card id
     title      text        NOT NULL,
     question   text        NOT NULL,
     tags       text[]      NOT NULL DEFAULT '{}',
     concepts   text[]      NOT NULL DEFAULT '{}',
     spec       jsonb       NOT NULL,
-    file_hash  text        NOT NULL,
-    loaded_at  timestamptz NOT NULL DEFAULT now()
+    yaml_text  text,
+    file_hash  text        NOT NULL DEFAULT '',
+    loaded_at  timestamptz NOT NULL DEFAULT now(),
+    updated_at timestamptz NOT NULL DEFAULT now()
 );
+ALTER TABLE cards ADD COLUMN IF NOT EXISTS yaml_text text;
+ALTER TABLE cards ADD COLUMN IF NOT EXISTS updated_at timestamptz NOT NULL DEFAULT now();
+ALTER TABLE cards ALTER COLUMN file_hash SET DEFAULT '';
+
+-- Enriched article readings linked to cards.
+CREATE TABLE IF NOT EXISTS readings (
+    id          text        PRIMARY KEY,
+    title       text        NOT NULL,
+    subtitle    text,
+    source      text,
+    published   text,
+    topics      text[]      NOT NULL DEFAULT '{}',
+    concepts    text[]      NOT NULL DEFAULT '{}',
+    card_ids    text[]      NOT NULL DEFAULT '{}',
+    body_md     text        NOT NULL,
+    source_url  text,
+    status      text        NOT NULL DEFAULT 'published',
+    origin      text        NOT NULL DEFAULT 'ingested',
+    created_at  timestamptz NOT NULL DEFAULT now(),
+    updated_at  timestamptz NOT NULL DEFAULT now()
+);
+
+-- Async article ingestion jobs triggered via the web UI or API.
+CREATE TABLE IF NOT EXISTS ingest_jobs (
+    id          uuid        PRIMARY KEY,
+    kind        text        NOT NULL,
+    title       text,
+    source_url  text,
+    status      text        NOT NULL,
+    step        text        NOT NULL DEFAULT 'queued',
+    error       text,
+    reading_id  text        REFERENCES readings(id) ON DELETE SET NULL,
+    card_ids    text[]      NOT NULL DEFAULT '{}',
+    created_at  timestamptz NOT NULL DEFAULT now(),
+    updated_at  timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS ingest_jobs_created_at_idx ON ingest_jobs (created_at DESC);

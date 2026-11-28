@@ -124,9 +124,11 @@ class PushPlan:
     entries: list[PushEntry] = field(default_factory=list)
     prod_ahead: list[Key] = field(default_factory=list)  # prod has a later revision: pull
     skipped_placements: list[Key] = field(default_factory=list)  # concept not in prod's tree
+    cards: list[tuple[str, Literal["new", "newer"]]] = field(default_factory=list)
+    readings: list[tuple[str, Literal["new", "newer"]]] = field(default_factory=list)
 
     def __bool__(self) -> bool:
-        return bool(self.entries)
+        return bool(self.entries or self.cards or self.readings)
 
 
 def _series_state(conn: psycopg.Connection, keys: list[Key] | None, *, synced_only: bool):
@@ -217,7 +219,77 @@ def plan_push(
         plan.entries.append(PushEntry(key, data.get(key), key in placed, counts.get(key, 0)))
     plan.prod_ahead.sort()
     plan.skipped_placements.sort()
+    if keys is None and _supports_dynamic_content(dev, prod):
+        plan.cards = _dynamic_updates(dev, prod, "cards", sql.SQL("yaml_text IS NOT NULL"))
+        plan.readings = _dynamic_updates(dev, prod, "readings", TRUE)
     return plan
+
+
+def _supports_dynamic_content(dev: psycopg.Connection, prod: psycopg.Connection) -> bool:
+    return (
+        "yaml_text" in _columns(dev, "cards")
+        and "yaml_text" in _columns(prod, "cards")
+        and bool(_columns(dev, "readings"))
+        and bool(_columns(prod, "readings"))
+    )
+
+
+def _dynamic_updates(
+    dev: psycopg.Connection,
+    prod: psycopg.Connection,
+    table: str,
+    where_sql: sql.Composable,
+) -> list[tuple[str, Literal["new", "newer"]]]:
+    dev_rows = dev.execute(
+        sql.SQL("SELECT id, updated_at FROM {t} WHERE {w} ORDER BY id").format(
+            t=sql.Identifier(table), w=where_sql
+        )
+    ).fetchall()
+    if not dev_rows:
+        return []
+    prod_map = {
+        r["id"]: r["updated_at"]
+        for r in prod.execute(
+            sql.SQL("SELECT id, updated_at FROM {t}").format(t=sql.Identifier(table))
+        )
+    }
+    updates: list[tuple[str, Literal["new", "newer"]]] = []
+    for row in dev_rows:
+        rid = row["id"]
+        if rid not in prod_map:
+            updates.append((rid, "new"))
+        elif row["updated_at"] and (prod_map[rid] is None or row["updated_at"] > prod_map[rid]):
+            updates.append((rid, "newer"))
+    return updates
+
+
+def _copy_upsert_by_id(
+    src: psycopg.Connection,
+    dst: psycopg.Connection,
+    table: str,
+    cols: list[str],
+    where: sql.Composable = TRUE,
+    params: tuple = (),
+) -> int:
+    tmp = f"_sync_{table}"
+    dst.execute(
+        sql.SQL("CREATE TEMP TABLE {tmp} (LIKE {t} INCLUDING DEFAULTS) ON COMMIT DROP").format(
+            tmp=sql.Identifier(tmp), t=sql.Identifier(table)
+        )
+    )
+    copied = copy_rows(src, dst, table, cols, where, params, into=tmp)
+    if copied == 0:
+        return 0
+    col_list = sql.SQL(", ").join(map(sql.Identifier, cols))
+    updates = sql.SQL(", ").join(
+        sql.SQL("{c} = EXCLUDED.{c}").format(c=sql.Identifier(c)) for c in cols if c != "id"
+    )
+    return dst.execute(
+        sql.SQL(
+            "INSERT INTO {t} ({cols}) SELECT {cols} FROM {tmp}"
+            " ON CONFLICT (id) DO UPDATE SET {sets}"
+        ).format(t=sql.Identifier(table), tmp=sql.Identifier(tmp), cols=col_list, sets=updates)
+    ).rowcount
 
 
 class UnpushedWork(TransferError):
@@ -313,6 +385,21 @@ def pull(
               AND NOT EXISTS (SELECT 1 FROM concepts c WHERE c.id = t.concept_id)
             """
         ).fetchone()["n"]
+        if keys is None and _supports_dynamic_content(dev, prod):
+            dev_card_cols, prod_card_cols = _columns(dev, "cards"), _columns(prod, "cards")
+            card_cols = [c for c in dev_card_cols if c in prod_card_cols]
+            dev_read_cols, prod_read_cols = _columns(dev, "readings"), _columns(prod, "readings")
+            reading_cols = [c for c in dev_read_cols if c in prod_read_cols]
+            dev.execute("DELETE FROM cards WHERE yaml_text IS NOT NULL")
+            n_cards = _copy_upsert_by_id(
+                prod, dev, "cards", card_cols, sql.SQL("yaml_text IS NOT NULL")
+            )
+            if n_cards:
+                rows["cards"] = n_cards
+            dev.execute("DELETE FROM readings")
+            n_readings = copy_rows(prod, dev, "readings", reading_cols)
+            if n_readings:
+                rows["readings"] = n_readings
     return PullResult(rows, skipped, missing)
 
 
@@ -321,6 +408,8 @@ class PushResult:
     series: int
     observations: int
     placements: int
+    cards: int = 0
+    readings: int = 0
 
 
 def apply_push(dev: psycopg.Connection, prod: psycopg.Connection, plan: PushPlan) -> PushResult:
@@ -333,10 +422,13 @@ def apply_push(dev: psycopg.Connection, prod: psycopg.Connection, plan: PushPlan
     obs_cols = shared_columns(dev, prod, "observations")
     placement_cols = shared_columns(dev, prod, "series_concepts")
     observations = 0
+    pushed_cards = 0
+    pushed_readings = 0
     with prod.transaction():
-        w, p = _where([e.key for e in plan.entries])
-        # A scheduled sync on the mini touching these series waits for this transaction.
-        prod.execute(sql.SQL("SELECT 1 FROM series WHERE {w} FOR UPDATE").format(w=w), p)
+        if plan.entries:
+            w, p = _where([e.key for e in plan.entries])
+            # A scheduled sync on the mini touching these series waits for this transaction.
+            prod.execute(sql.SQL("SELECT 1 FROM series WHERE {w} FOR UPDATE").format(w=w), p)
         if data_keys:
             w, p = _where(data_keys)
             cols = sql.SQL(", ").join(map(sql.Identifier, series_cols))
@@ -373,4 +465,28 @@ def apply_push(dev: psycopg.Connection, prod: psycopg.Connection, plan: PushPlan
                     " ON CONFLICT (source, series_id) DO UPDATE SET {sets}"
                 ).format(cols=cols, sets=_set_clause(placement_cols))
             )
-    return PushResult(len(data_keys), observations, len(placement_keys))
+        if plan.cards:
+            dev_card_cols, prod_card_cols = _columns(dev, "cards"), _columns(prod, "cards")
+            card_cols = [c for c in dev_card_cols if c in prod_card_cols]
+            pushed_cards = _copy_upsert_by_id(
+                dev,
+                prod,
+                "cards",
+                card_cols,
+                sql.SQL("id = ANY(%s)"),
+                ([cid for cid, _ in plan.cards],),
+            )
+        if plan.readings:
+            dev_read_cols, prod_read_cols = _columns(dev, "readings"), _columns(prod, "readings")
+            reading_cols = [c for c in dev_read_cols if c in prod_read_cols]
+            pushed_readings = _copy_upsert_by_id(
+                dev,
+                prod,
+                "readings",
+                reading_cols,
+                sql.SQL("id = ANY(%s)"),
+                ([rid for rid, _ in plan.readings],),
+            )
+    return PushResult(
+        len(data_keys), observations, len(placement_keys), pushed_cards, pushed_readings
+    )
