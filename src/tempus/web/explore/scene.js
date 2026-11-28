@@ -19,13 +19,7 @@ export class TreeScene {
     this.root = root;
     this.theme = theme;
     this.handlers = handlers; // {hover(item|null, x, y), click(item), labels() → [ids]}
-    this.c = Object.fromEntries(Object.entries(theme.color).filter(([, v]) => typeof v === "string")
-      .map(([k, v]) => [k, new THREE.Color(v)]));
-    this.freqColor = {
-      D: new THREE.Color(theme.color["neon-cyan"]), W: new THREE.Color(theme.color["neon-violet"]),
-      M: new THREE.Color(theme.color.primary), Q: new THREE.Color(theme.color["neon-orange"]),
-      Y: new THREE.Color(theme.color["neon-green"]), irregular: new THREE.Color(theme.color.pencil),
-    };
+    this.loadColors(theme);
     this.focusId = undefined;
     this.trail = [];
     this.matches = new Set();
@@ -36,6 +30,25 @@ export class TreeScene {
     this.camera.position.copy(V(OVERVIEW.pos));
     this.loop = this.loop.bind(this);
     requestAnimationFrame(this.loop);
+  }
+
+  loadColors(theme) {
+    this.c = Object.fromEntries(
+      Object.entries(theme.color)
+        .filter(([, v]) => typeof v === "string" && v.startsWith("#"))
+        .map(([k, v]) => [k, new THREE.Color(v)])
+    );
+    this.freqColor = {
+      D: new THREE.Color(theme.color["neon-cyan"]), W: new THREE.Color(theme.color["neon-violet"]),
+      M: new THREE.Color(theme.color.primary), Q: new THREE.Color(theme.color["neon-orange"]),
+      Y: new THREE.Color(theme.color["neon-green"]), irregular: new THREE.Color(theme.color.pencil),
+    };
+  }
+
+  setTheme(theme) {
+    this.theme = theme;
+    this.loadColors(theme);
+    this.setTrail(this.trail, [...this.matches]);
   }
 
   build() {

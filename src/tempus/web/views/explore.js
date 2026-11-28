@@ -5,6 +5,7 @@ import { compareToggle } from "../compare.js";
 import { esc, fmtInt, FREQ } from "../util.js";
 
 const FREQ_KEYS = ["D", "W", "M", "Q", "Y"];
+const FREQ_VARS = { D: "var(--neon-cyan)", W: "var(--neon-violet)", M: "var(--primary)", Q: "var(--neon-orange)", Y: "var(--neon-green)" };
 const SERIES_SHOWN = 40;
 const EXAMPLES = ["crude oil", "mortgage rates", "jobs report", "home prices in san francisco", "yield curve", "bitcoin"];
 
@@ -89,6 +90,11 @@ export class ExploreView {
     window.removeEventListener("keydown", this.keys);
     this.scene?.dispose();
     this.scene = null;
+  }
+
+  onThemeChange(theme) {
+    this.theme = theme;
+    this.scene?.setTheme(theme);
   }
 
   async setMode(mode, { save = true } = {}) {
@@ -309,10 +315,8 @@ export class ExploreView {
   }
 
   renderLegend() {
-    const c = this.theme.color;
-    const color = { D: c["neon-cyan"], W: c["neon-violet"], M: c.primary, Q: c["neon-orange"], Y: c["neon-green"] };
     this.el.querySelector(".legend").innerHTML = FREQ_KEYS.map((k) =>
-      `<span class="chip"><span class="dot" style="background:${color[k]}"></span>${FREQ[k]}</span>`).join("") +
+      `<span class="chip"><span class="dot" style="background:${FREQ_VARS[k]}"></span>${FREQ[k]}</span>`).join("") +
       `<span class="chip"><span class="dot ring"></span>ringed = synced</span>`;
   }
 
@@ -352,11 +356,9 @@ export class ExploreView {
 }
 
 export function seriesList(list, theme, withP = false) {
-  const c = theme.color;
-  const color = { D: c["neon-cyan"], W: c["neon-violet"], M: c.primary, Q: c["neon-orange"], Y: c["neon-green"] };
   return `<ul class="series-list">${list.map((s) => `
     <li><a href="#/series/${esc(s.source)}/${encodeURIComponent(s.id)}" title="${esc(s.title)}">
-      <span class="dot${s.synced ? " ring" : ""}" style="background:${color[s.freq] ?? c.pencil}"></span>
+      <span class="dot${s.synced ? " ring" : ""}" style="background:${FREQ_VARS[s.freq] ?? "var(--pencil)"}"></span>
       <span class="t">${esc(s.title)}</span>
       <code>${esc(s.id)}</code>${withP ? `<i class="p" style="--w:${Math.round((s.p ?? 0) * 100)}%">${(s.p ?? 0).toFixed(2)}</i>` : ""}
     </a>${compareToggle(`${s.source}:${s.id}`, s.title ?? s.id)}</li>`).join("")}</ul>`;

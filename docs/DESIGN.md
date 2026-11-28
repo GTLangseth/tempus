@@ -1,9 +1,10 @@
 ---
 version: alpha
-name: Tempus — Neon Notebook
+name: Tempus — Neon Notebook & Catppuccin Macchiato
 description: >-
-  A retro graph-paper notebook that stays calm and neutral, so that hot arcade-neon
-  numbers and chart lines can do the shouting. Draws on docs/design/C2.md (cream sketchbook,
+  A retro graph-paper notebook that stays calm and neutral in light mode (warm cream canvas,
+  paper stickers, hairline dividers, arcade-neon metrics) paired with a Catppuccin Macchiato
+  dark theme via semantic CSS custom properties. Draws on docs/design/C2.md (cream sketchbook,
   hairline cards, flat surfaces) and docs/design/C1.md (monospace lab labels, data-first
   restraint).
 colors:
@@ -153,10 +154,15 @@ else in small monospace "lab notes" text.
 
 ## Colors
 
+Tempus pairs its light **Neon Notebook** palette with a **Catppuccin Macchiato** dark palette, honoring `prefers-color-scheme` by default and allowing a two-state header toggle (`Macchiato` / `Paper`) via `<meta name="color-scheme">` and `light-dark()`.
+
+### Light Mode — Neon Notebook
+
 - **Neutrals carry the page.** Canvas `#f2efe6` is the notebook. Grid `#e2ddcf` is the ruling
-  and stays faint. Paper `#fbf9f3` lifts cards off the canvas. Hairline `#d4cfbf` draws card
-  edges and dividers. Ink `#1c1b19` is used for all reading text. Graphite `#4a4843` is for
-  secondary text, and pencil `#6b675e` for labels and axes.
+  and stays faint. Paper `#fbf9f3` lifts cards off the canvas. Surface `#f2efe6` backs subtle
+  hover/input states. Hairline `#d4cfbf` draws dividers, while card borders (`--border-card`)
+  and sticker shadows (`--shadow-card`) use `#1c1b19`. Ink `#1c1b19` is used for all reading
+  text, graphite `#4a4843` for secondary text, and pencil `#6b675e` for labels and axes.
 - **Neon is for signal.** The "arcade" set is deliberately hot: primary pink `#ff1f8f`, cyan
   `#00a3e8`, orange `#ff5a1f`, violet `#8b3dff` and green `#00b860`. That heat costs
   contrast, so the colors split into two jobs:
@@ -166,11 +172,27 @@ else in small monospace "lab notes" text.
     type. Use them only for chart lines, bars and dots, and always pair them with a legend
     chip or direct label so the line never relies on color alone.
 - **Highlighters are fills, not ink.** Lime `#b6ff00` and yellow `#fff200` have about 1.1:1
-  contrast on cream, so they only ever sit behind ink text, like a marker stroke. Ink on lime
-  reaches 14:1.
+  contrast on cream, so they only ever sit behind `--highlight-ink` (`#1c1b19`), like a marker
+  stroke. Ink on lime reaches 14:1.
 - **Series order** for charts (`chart-series-1…5`): pink, cyan, orange, violet, green. A card's
   first series always takes pink, so its stat figure matches its main line. Secondary stats
   are set in ink with a small series-colored dot.
+
+### Dark Mode — Catppuccin Macchiato
+
+- **Neutrals:** `--canvas` `#1e2030` (Mantle), `--paper` `#24273a` (Base), `--surface` `#363a4f`
+  (Surface0), `--grid` `#2c3046`, `--hairline` `#494d64` (Surface1), `--border-card` `#5b6078`
+  (Surface2), `--shadow-card` `#181926` (Crust), `--scrollbar-track` `#1e2030`, and
+  `--scrollbar-thumb` `#8087a2` (Overlay1).
+- **Text:** `--ink` `#cad3f5` (Text), `--graphite` `#b8c0e0` (Subtext1), `--pencil` `#939ab7`
+  (Overlay2).
+- **Accents & Interactive Tokens:** `--primary` `#f5bde6` (Pink), `--neon-cyan` `#91d7e3` (Sky),
+  `--neon-orange` `#f5a97f` (Peach), `--neon-violet` `#c6a0f6` (Mauve), `--neon-green` `#a6da95`
+  (Green), `--highlight-lime` `#a6da95` (Green), `--highlight-yellow` `#eed49f` (Yellow),
+  `--highlight-ink` `#181926` (Crust), `--marker-bg` `rgba(166, 218, 149, 0.34)`,
+  `--btn-bg` `#c6a0f6` (Mauve), `--btn-fg` `#181926` (Crust), `--btn-hover-bg` `#b7bdf8`
+  (Lavender), `--btn-hover-fg` `#181926` (Crust), `--tooltip-bg` `#181926` (Crust),
+  `--tooltip-fg` `#cad3f5` (Text), and `--dot-ring` `#181926` (Crust).
 
 ## Typography
 
@@ -194,8 +216,8 @@ else in small monospace "lab notes" text.
 
 ## Elevation & Depth
 
-Every card is a sticker: paper with a 1px ink edge and a hard offset shadow
-(`3px 3px 0 ink`), with no blur. It reads as a sticker pressed onto the page, not as a
+Every card is a sticker: paper with a 1px `--border-card` edge and a hard offset shadow
+(`3px 3px 0 var(--shadow-card)`), with no blur. It reads as a sticker pressed onto the page, not as a
 floating layer. Nothing else casts a shadow. A pinned card is marked by `PINNED` in its
 eyebrow, not by a different shadow.
 

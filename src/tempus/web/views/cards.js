@@ -5,9 +5,10 @@ import { keepCard } from "../api.js";
 import { esc, FREQ } from "../util.js";
 
 const LAG_SHORT = { D: "d", W: "wk", M: "mo", Q: "qtr", Y: "yr" };
+const SERIES_VARS = ["var(--primary)", "var(--neon-cyan)", "var(--neon-orange)", "var(--neon-violet)", "var(--neon-green)"];
 
 // The card's single neon figure: the lag-correlation peak, else the first stat or series value.
-export function headlineStats(payloads, theme) {
+export function headlineStats(payloads) {
   const out = [];
   const lag = payloads.find((p) => p.type === "lagcorr" && p.annotations?.peak);
   const series = payloads.filter((p) => p.type === "timeseries").flatMap((p) => p.series);
@@ -20,7 +21,7 @@ export function headlineStats(payloads, theme) {
     const last = [...s.points].reverse().find((pt) => pt[1] != null);
     if (!last) return;
     const unit = s.units === "%" || s.units === "Percent" ? "%" : "";
-    out.push({ neon: !lag && i === 0, dot: lag || i > 0 ? theme.color.series[i % 5] : null,
+    out.push({ neon: !lag && i === 0, dot: lag || i > 0 ? SERIES_VARS[i % SERIES_VARS.length] : null,
                value: `${fmt(last[1])}${unit}`, label: `${s.label} · ${last[0]}` });
   });
   return out;
@@ -57,9 +58,9 @@ export function statRow(stats) {
     s.dot ? `<span class="dot" style="background:${s.dot}"></span>` : ""}${esc(s.value)}</b><span class="label">${esc(s.label)}</span></div>`).join("")}</div>` : "";
 }
 
-export function chips(series, theme) {
+export function chips(series) {
   return series.map((s, i) => `<span class="chip"><span class="dot"
-    style="background:${theme.color.series[i % theme.color.series.length]}"></span>${esc(s.label)}</span>`).join("");
+    style="background:${SERIES_VARS[i % SERIES_VARS.length]}"></span>${esc(s.label)}</span>`).join("");
 }
 
 // Draw a list of panel payloads into `holder`; returns the chart instances to dispose later.

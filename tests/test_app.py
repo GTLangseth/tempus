@@ -81,6 +81,30 @@ def test_static_index_is_served(settings):
     assert TestClient(create_app(settings)).get("/").status_code == 200
 
 
+def test_dark_mode_assets_are_served(settings):
+    client = TestClient(create_app(settings))
+    index = client.get("/")
+    assert index.status_code == 200
+    assert '<meta name="color-scheme" content="light dark">' in index.text
+    assert 'id="theme-toggle"' in index.text
+    assert "tempus.theme" in index.text
+
+    theme_res = client.get("/theme.json")
+    assert theme_res.status_code == 200
+    theme = theme_res.json()
+    assert set(theme["color"]) == set(theme["dark"])
+    assert theme["dark"]["canvas"] == "#1e2030"
+    assert len(theme["color"]["series"]) == 5
+    assert len(theme["dark"]["series"]) == 5
+
+    css_res = client.get("/style.css")
+    assert css_res.status_code == 200
+    assert "color-scheme: light dark;" in css_res.text
+    assert "light-dark(" in css_res.text
+
+    assert client.get("/theme.js").status_code == 200
+
+
 class _CountingSource:
     def __init__(self):
         self.calls = 0

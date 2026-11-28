@@ -8,6 +8,7 @@ import { esc } from "../util.js";
 import { drawPanels, errorBlock, keepAndOpen } from "./cards.js";
 
 const MODE_WORDS = { levels: "Levels", rebased: "Rebased to 100", yoy: "Year-over-year", zscore: "Standard deviations" };
+const SERIES_VARS = ["var(--primary)", "var(--neon-cyan)", "var(--neon-orange)", "var(--neon-violet)", "var(--neon-green)"];
 const modeWords = (m) => MODE_WORDS[m] ?? m;
 const month = (d) => (d ? d.slice(0, 7) : "?");
 
@@ -19,13 +20,13 @@ function signed(r) {
 // Tinted lightly enough that ink stays readable; the printed number carries the meaning.
 function tint(r) {
   const hue = r >= 0 ? "--neon-violet" : "--neon-orange";
-  return `background: color-mix(in srgb, var(${hue}) ${Math.round(Math.abs(r) * 40)}%, var(--paper))`;
+  return `background: color-mix(in oklab, var(${hue}) ${Math.round(Math.abs(r) * 40)}%, var(--paper))`;
 }
 
-function matrixTable(corr, series, theme) {
+function matrixTable(corr, series) {
   const at = corr.refs.map((ref) => series.findIndex((s) => s.series === ref));
   const titles = at.map((i, k) => series[i]?.title ?? corr.refs[k]);
-  const color = (k) => theme.color.series[Math.max(at[k], 0) % theme.color.series.length];
+  const color = (k) => SERIES_VARS[Math.max(at[k], 0) % SERIES_VARS.length];
   const head = (i, n) => `<span class="dot" style="background:${color(i)}"></span>${refLabel(corr.refs[i], titles[i], n)}`;
   const hasNull = corr.matrix.some((row) => row.some((v) => v == null));
   const span = corr.months ? `, ${corr.months} months (${month(corr.start)} – ${month(corr.end)})` : "";
@@ -128,7 +129,7 @@ export class CompareView {
     const titles = series.map((s) => s.title ?? s.series);
     const errors = result.errors.filter((e) => e.level === "error");
     const warnings = result.errors.filter((e) => e.level === "warning");
-    const color = (i) => this.theme.color.series[i % this.theme.color.series.length];
+    const color = (i) => SERIES_VARS[i % SERIES_VARS.length];
 
     this.root.innerHTML = `<main class="feed compare">
       <div><div class="label">compare · not kept yet</div>

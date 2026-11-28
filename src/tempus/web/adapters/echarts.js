@@ -3,6 +3,7 @@
 export const fmt = (v) => (v == null ? "—" : Math.abs(v) >= 100 ? v.toFixed(0) : v.toFixed(2));
 
 const LAG_UNIT = { D: "days", W: "weeks", M: "months", Q: "quarters", Y: "years" };
+const activeCharts = new Map(); // chart instance -> panel payload
 
 function base(theme) {
   const c = theme.color;
@@ -14,8 +15,8 @@ function base(theme) {
     grid: { left: 52, right: 20, top: 28, bottom: 64 },
     legend: { show: false }, // legends are HTML chips next to the chart
     tooltip: {
-      trigger: "axis", backgroundColor: c.ink, borderWidth: 0, padding: [6, 10],
-      textStyle: { color: c.paper, fontFamily: theme.font.mono, fontSize: 11 },
+      trigger: "axis", backgroundColor: c["tooltip-bg"] ?? c.ink, borderWidth: 0, padding: [6, 10],
+      textStyle: { color: c["tooltip-fg"] ?? c.paper, fontFamily: theme.font.mono, fontSize: 11 },
       valueFormatter: fmt,
     },
   };
@@ -47,11 +48,11 @@ const OPTIONS = {
       itemStyle: { color: c.series[i % c.series.length] },
       emphasis: { disabled: true },
     }));
-    // Points are drawn only at the last value: a neon dot with an ink ring.
+    // Points are drawn only at the last value: a neon dot with a crisp ring.
     const dots = p.series.map((s, i) => ({
       type: "scatter", silent: true, symbolSize: 8, tooltip: { show: false }, z: 3,
       data: lastPoint(s.points) ? [lastPoint(s.points)] : [],
-      itemStyle: { color: c.series[i % c.series.length], borderColor: c.ink, borderWidth: 1.5 },
+      itemStyle: { color: c.series[i % c.series.length], borderColor: c["dot-ring"] ?? c.ink, borderWidth: 1.5 },
     }));
     const units = p.series[0]?.units;
     return {
@@ -64,10 +65,11 @@ const OPTIONS = {
       dataZoom: [
         { type: "inside" },
         { type: "slider", height: 18, bottom: 14, borderColor: c.hairline,
-          backgroundColor: "transparent", fillerColor: "rgba(28, 27, 25, 0.06)",
+          backgroundColor: "transparent", fillerColor: c["chart-filler"] ?? "rgba(28, 27, 25, 0.06)",
           dataBackground: { lineStyle: { color: c.pencil, width: 1 }, areaStyle: { color: c.grid } },
           selectedDataBackground: { lineStyle: { color: c.ink, width: 1 }, areaStyle: { color: c.hairline } },
-          handleStyle: { color: c.paper, borderColor: c.ink }, moveHandleStyle: { color: c.ink },
+          handleStyle: { color: c.paper, borderColor: c["border-card"] ?? c.ink },
+          moveHandleStyle: { color: c["border-card"] ?? c.ink },
           textStyle: { color: c.pencil, fontFamily: theme.font.mono, fontSize: 10 } },
       ],
       series: [...lines, ...dots],
@@ -83,7 +85,7 @@ const OPTIONS = {
       ...base(theme),
       grid: { left: 52, right: 20, top: 20, bottom: 44 },
       tooltip: { ...base(theme).tooltip, axisPointer: { type: "shadow",
-                 shadowStyle: { color: "rgba(28, 27, 25, 0.05)" } } },
+                 shadowStyle: { color: c["chart-shadow"] ?? "rgba(28, 27, 25, 0.05)" } } },
       xAxis: axis(theme, { type: "category", data: rows.map((r) => r.lag),
                            name: `LAG (${unit.toUpperCase()}) · X LEADS Y`,
                            nameLocation: "middle", nameGap: 28, splitLine: { show: false } }),
@@ -141,6 +143,24 @@ export function renderPanel(el, payload, theme) {
   }
   const chart = echarts.init(el, null, { renderer: "canvas" });
   chart.setOption(OPTIONS[payload.type](payload, theme));
-  new ResizeObserver(() => chart.resize()).observe(el);
+  const ro = new ResizeObserver(() => chart.resize());
+  ro.observe(el);
+  activeCharts.set(chart, payload);
+  const origDispose = chart.dispose.bind(chart);
+  chart.dispose = () => {
+    ro.disconnect();
+    activeCharts.delete(chart);
+    origDispose();
+  };
   return chart;
+}
+
+export function rethemeCharts(theme) {
+  for (const [chart, payload] of activeCharts) {
+    if (chart.isDisposed?.()) {
+      activeCharts.delete(chart);
+      continue;
+    }
+    chart.setOption(OPTIONS[payload.type](payload, theme), { notMerge: true });
+  }
 }
